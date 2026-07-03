@@ -129,6 +129,8 @@ a { color: inherit; }
 
 /* Brand */
 .brand {
+  display: grid;
+  place-items: center;
   text-align: center;
   padding: 14px 10px;
   border: 1px solid rgba(255,255,255,0.12);
@@ -136,8 +138,11 @@ a { color: inherit; }
   background: rgba(255,255,255,0.05);
 }
 
-.brand-logo {
-  width: 120px;
+.brand-logo,
+.hero-logo {
+  display: block;
+  margin: 0 auto;
+  width: min(100%, 200px);
   max-width: 100%;
   height: auto;
   object-fit: contain;
@@ -146,8 +151,6 @@ a { color: inherit; }
 
 .hero-logo {
   width: min(100%, 200px);
-  object-fit: contain;
-  background: transparent;
 }
 
 .brand strong {
@@ -270,6 +273,32 @@ a { color: inherit; }
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.mobile-menu-btn {
+  display: none;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 1rem;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.shell.sidebar-open .sidebar-overlay {
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Content */
@@ -719,28 +748,18 @@ a { color: inherit; }
 
 .login-hero {
   padding: 36px 32px;
-  background: linear-gradient(160deg, var(--green-deep) 0%, #0d6040 100%);
+  background: var(--green-deep);
   color: #eef7f4;
   display: grid;
   align-content: space-between;
+  justify-items: center;
   gap: 28px;
   position: relative;
   overflow: hidden;
 }
 
-/* Padrão africano decorativo no hero do login */
 .login-hero::before {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 8px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--gold)      0px, var(--gold) 10px,
-    transparent      10px, transparent 14px,
-    #3a8f5e          14px, #3a8f5e    24px,
-    transparent      24px, transparent 28px
-  );
+  display: none;
 }
 
 .login-hero h1 {
@@ -808,10 +827,36 @@ a { color: inherit; }
 @media (max-width: 1100px) {
   .shell { grid-template-columns: 1fr; }
 
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(280px, 85vw);
+    transform: translateX(-110%);
+    transition: transform 0.3s ease;
+    z-index: 15;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  }
+
+  .shell.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
   .sidebar::before,
   .sidebar::after { display: none; }
 
   .sidebar-inner { gap: 14px; padding: 14px 14px 18px; }
+
+  .mobile-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .shell.sidebar-open .main {
+    pointer-events: none;
+  }
 
   .grid.cards,
   .grid.two,

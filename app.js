@@ -2,6 +2,34 @@ const STORAGE_KEY = "iasd_escola_sabatina_v2";
 const LOGO_MAIN = "./logo/logo-main.png";
 const LOGO_SECONDARY = "./logo/logo-secondary.png";
 
+// Helper functions - must be defined before seed()
+function localISODate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function todayISO(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return localISODate(d);
+}
+
+function nextSaturdayISO() {
+  const d = new Date();
+  const day = d.getDay();
+  const delta = day === 6 ? 7 : (6 - day + 7) % 7 || 7;
+  d.setDate(d.getDate() + delta);
+  return localISODate(d);
+}
+
+function currentQuarter() {
+  const d = new Date();
+  const quarter = Math.floor(d.getMonth() / 3) + 1;
+  return `${d.getFullYear()}-T${quarter}`;
+}
+
 const icon = (name) => {
   const map = {
     home: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10.5V20h14v-9.5"/><path d="M9 20v-6h6v6"/></svg>`,
@@ -13,6 +41,8 @@ const icon = (name) => {
     ranking: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 16v-6"/><path d="M12 16V8"/><path d="M17 16v-3"/></svg>`,
     reports: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h1"/></svg>`,
     messages: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M7 8h10"/><path d="M7 12h7"/></svg>`,
+    eye: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+    eyeOff: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>`,
     logout: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 3v18"/></svg>`,
     add: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14"/><path d="M5 12h14"/></svg>`,
     save: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>`,
@@ -24,6 +54,11 @@ const icon = (name) => {
 
 const seed = () => ({
   session: null,
+  settings: {
+    attendanceWeight: 50,
+    lessonWeight: 30,
+    participationWeight: 20,
+  },
   ui: {
     view: "dashboard",
     memberFilterClass: "all",
@@ -35,17 +70,13 @@ const seed = () => ({
     programDate: nextSaturdayISO(),
     messageMode: "inbox",
     rankingPeriod: "quarter",
-    reportType: "attendance",
-    reportPeriod: "quarter",
-    reportClassId: "all",
-    reportDate: todayISO(),
+    reportDate: "",
+    reportYear: new Date().getFullYear(),
+    reportQuarter: Math.floor(new Date().getMonth() / 3) + 1,
+    reportWeek: 1,
     editMemberId: null,
     settingsTab: "weights",
-  },
-  settings: {
-    attendanceWeight: 50,
-    lessonWeight: 30,
-    participationWeight: 20,
+    sidebarOpen: false,
   },
   classes: [
     { id: "classe-01-adultos", name: "Classe 01-Adultos", leader: "Irm. Responsável" },
@@ -104,19 +135,51 @@ const seed = () => ({
   ],
   users: [
     {
-      id: "u1",
+      id: "u0",
       username: "secretario",
-      password: "1234",
+      password: "Direcao26",
       role: "secretary",
       name: "Secretário Geral",
     },
     {
+      id: "u1",
+      username: "joaquim",
+      password: "Membro26",
+      role: "member",
+      name: "Joaquim Paulo",
+      memberId: "m1",
+    },
+    {
       id: "u2",
       username: "maria",
-      password: "1234",
+      password: "Membro26",
       role: "member",
       name: "Maria Lúcia",
       memberId: "m2",
+    },
+    {
+      id: "u3",
+      username: "anselmo",
+      password: "Membro26",
+      role: "member",
+      name: "Anselmo Cossa",
+      memberId: "m3",
+    },
+    {
+      id: "u4",
+      username: "lurdes",
+      password: "Membro26",
+      role: "member",
+      name: "Lurdes Nhampossa",
+      memberId: "m4",
+    },
+    {
+      id: "u5",
+      username: "antônio",
+      password: "Membro26",
+      role: "member",
+      name: "António Mucavele",
+      memberId: "m5",
     },
   ],
   attendance: [
@@ -232,29 +295,6 @@ const seed = () => ({
   ],
 });
 
-let state = loadState();
-
-const app = document.getElementById("app");
-
-function todayISO(offsetDays = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return localISODate(d);
-}
-
-function nextSaturdayISO() {
-  const d = new Date();
-  const day = d.getDay();
-  const delta = day === 6 ? 7 : (6 - day + 7) % 7 || 7;
-  d.setDate(d.getDate() + delta);
-  return localISODate(d);
-}
-
-function currentQuarter() {
-  const d = new Date();
-  const quarter = Math.floor(d.getMonth() / 3) + 1;
-  return `${d.getFullYear()}-T${quarter}`;
-}
 
 function formatDate(dateString) {
   return new Intl.DateTimeFormat("pt-MZ", {
@@ -297,6 +337,10 @@ function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+let state = loadState();
+
+const app = document.getElementById("app");
+
 function currentUser() {
   if (!state.session) return null;
   return state.users.find((user) => user.id === state.session.userId) || null;
@@ -321,10 +365,8 @@ function memberClass(member) {
 }
 
 function visibleMembers() {
-  const member = currentMember();
   if (isSecretary()) return state.members;
-  if (member) return state.members.filter((item) => item.id === member.id);
-  return [];
+  return state.members.filter((item) => item.active);
 }
 
 function visibleMessages() {
@@ -357,9 +399,11 @@ function programsForDate(date) {
   return state.programs.filter((program) => program.date === date).sort((a, b) => a.order - b.order);
 }
 
-function getAttendanceSummary(classId, fromDate = null) {
+function getAttendanceSummary(classId, fromDate = null, toDate = null) {
   const members = state.members.filter((member) => member.classId === classId && member.active);
-  const sessions = sessionsForClass(classId).filter((session) => !fromDate || session.date >= fromDate);
+  const sessions = sessionsForClass(classId).filter(
+    (session) => (!fromDate || session.date >= fromDate) && (!toDate || session.date <= toDate)
+  );
   const possible = members.length * sessions.length || 1;
   const present = sessions.reduce(
     (total, session) =>
@@ -376,10 +420,17 @@ function getAttendanceSummary(classId, fromDate = null) {
   };
 }
 
-function scoreClass(classId, startDate = null) {
-  const attendance = getAttendanceSummary(classId, startDate);
-  const lessonCount = lessonsForClass(classId).filter((lesson) => !startDate || lesson.date >= startDate).length;
-  const programCount = state.programs.filter((item) => item.classId === classId && (!startDate || item.date >= startDate)).length;
+function scoreClass(classId, startDate = null, endDate = null) {
+  const attendance = getAttendanceSummary(classId, startDate, endDate);
+  const lessonCount = lessonsForClass(classId).filter(
+    (lesson) => (!startDate || lesson.date >= startDate) && (!endDate || lesson.date <= endDate)
+  ).length;
+  const programCount = state.programs.filter(
+    (item) =>
+      item.classId === classId &&
+      (!startDate || item.date >= startDate) &&
+      (!endDate || item.date <= endDate)
+  ).length;
   return {
     attendance: attendance.rate,
     lesson: Math.min(100, lessonCount * 20),
@@ -387,12 +438,24 @@ function scoreClass(classId, startDate = null) {
   };
 }
 
-function rankingRows(period) {
-  const startDate =
-    period === "week" ? todayISO(-7) : period === "quarter" ? quarterStartISO() : null;
+function rankingRows(period, year = state.ui.reportYear, quarter = state.ui.reportQuarter, week = state.ui.reportWeek) {
+  let startDate = null;
+  let endDate = null;
+
+  if (period === "week") {
+    startDate = getReportDateForQuarterWeek(year, quarter, week);
+    endDate = startDate;
+  } else if (period === "quarter") {
+    startDate = localISODate(firstSaturdayOfQuarter(year, quarter));
+    endDate = getReportDateForQuarterWeek(year, quarter, 13);
+  } else if (period === "year") {
+    startDate = `${year}-01-01`;
+    endDate = `${year}-12-31`;
+  }
+
   return state.classes
     .map((klass) => {
-      const score = scoreClass(klass.id, startDate);
+      const score = scoreClass(klass.id, startDate, endDate);
       const weighted =
         (score.attendance * state.settings.attendanceWeight +
           score.lesson * state.settings.lessonWeight +
@@ -415,11 +478,42 @@ function quarterStartISO() {
   return localISODate(d);
 }
 
-function localISODate(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function getQuarterKey(year, quarter) {
+  return `${year}-T${quarter}`;
+}
+
+function firstSaturdayOfQuarter(year, quarter) {
+  const d = new Date(year, (quarter - 1) * 3, 1);
+  const day = d.getDay();
+  const offset = (6 - day + 7) % 7;
+  d.setDate(d.getDate() + offset);
+  return d;
+}
+
+function getReportDateForQuarterWeek(year, quarter, week) {
+  const date = new Date(firstSaturdayOfQuarter(year, quarter));
+  date.setDate(date.getDate() + (week - 1) * 7);
+  return localISODate(date);
+}
+
+function weeklyReportsForQuarter(year, quarter) {
+  return state.weeklyReports
+    .filter((item) => reportQuarterForDate(item.date) === getQuarterKey(year, quarter))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function getWeeklyReportDateForQuarterWeek(year, quarter, week) {
+  const reports = weeklyReportsForQuarter(year, quarter);
+  if (reports[week - 1]) {
+    return reports[week - 1].date;
+  }
+  return getReportDateForQuarterWeek(year, quarter, week);
+}
+
+function getWeeklyReportDate() {
+  const selectedDate = state.ui.reportDate;
+  if (selectedDate) return selectedDate;
+  return getWeeklyReportDateForQuarterWeek(state.ui.reportYear, state.ui.reportQuarter, state.ui.reportWeek);
 }
 
 function loginView() {
@@ -443,7 +537,10 @@ function loginView() {
             </div>
             <div class="field">
               <label for="password">Senha</label>
-              <input id="password" name="password" type="password" autocomplete="current-password" value="1234" />
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="password" name="password" type="password" autocomplete="current-password" value="Direcao26" style="flex:1;" />
+                <button type="button" data-action="toggle-password" style="padding:8px;background:none;border:none;cursor:pointer;color:#58706b;">${icon("eye")}</button>
+              </div>
             </div>
             <button class="btn primary" type="submit">${icon("home")} Entrar</button>
           </div>
@@ -458,7 +555,8 @@ function shellView() {
   const secretary = isSecretary();
   const navItems = [
     ["dashboard", "Visão Geral", "home"],
-    ...(secretary ? [["members", "Membros", "members"], ["attendance", "Presenças", "attendance"], ["lessons", "Lições", "lessons"], ["requests", "Trimestrais", "requests"]] : []),
+    ["members", "Membros", "members"],
+    ...(secretary ? [["attendance", "Presenças", "attendance"], ["lessons", "Lições", "lessons"], ["requests", "Trimensários", "requests"]] : []),
     ["program", "Programa", "program"],
     ["ranking", "Classe em Destaque", "ranking"],
     ["reports", "Relatórios", "reports"],
@@ -467,7 +565,7 @@ function shellView() {
 
   const summary = dashboardSummary();
   return `
-    <div class="shell">
+    <div class="shell ${state.ui.sidebarOpen ? "sidebar-open" : ""}">
       <aside class="sidebar">
         <div class="brand">
           <img class="brand-logo" src="${LOGO_SECONDARY}" alt="Cora��o e Alma da Igreja" />
@@ -495,14 +593,15 @@ function shellView() {
           <button type="button" class="btn ghost" data-action="logout">${icon("logout")} Sair</button>
         </div>
       </aside>
+      <div class="sidebar-overlay" data-action="close-sidebar"></div>
       <main class="main">
         <header class="topbar">
+          <button type="button" class="btn mobile-menu-btn" data-action="toggle-sidebar" aria-label="Abrir menu">☰</button>
           <div>
             <h1>${pageTitle(state.ui.view)}</h1>
             </div>
           <div class="topbar-actions">
             <span class="chip ${secretary ? "" : "gray"}">${secretary ? "Acesso administrativo" : "Acesso de membro"}</span>
-            <button type="button" class="btn" data-action="reset-demo">Recarregar demo</button>
           </div>
         </header>
         <div class="content">${renderView()}</div>
@@ -517,7 +616,7 @@ function pageTitle(view) {
     members: "Membros",
     attendance: "Presenças",
     lessons: "Lições e Estudos",
-    requests: "Requisições de Trimestrais",
+    requests: "Requisições de Trimensários",
     program: "Programa do Próximo Sábado",
     ranking: "Classe em Destaque",
     reports: "Relatórios e Estatísticas",
@@ -541,13 +640,13 @@ function renderView() {
   const secretary = isSecretary();
   switch (state.ui.view) {
     case "members":
-      return secretary ? membersView() : readOnlyPanel("Este módulo está disponível para o secretário.");
+      return membersView();
     case "attendance":
       return secretary ? attendanceView() : readOnlyPanel("O registo de presenças é restrito à direcção.");
     case "lessons":
       return secretary ? lessonsView() : readOnlyPanel("A gestão de lições é restrita à direcção.");
     case "requests":
-      return secretary ? requestsView() : readOnlyPanel("As requisições de trimestrais são geridas pela direcção.");
+      return secretary ? requestsView() : readOnlyPanel("As requisições de trimensários são geridas pela direcção.");
     case "program":
       return programView();
     case "ranking":
@@ -571,92 +670,392 @@ function readOnlyPanel(message) {
 
 function dashboardView() {
   const summary = buildDashboard();
+  const quarter = state.ui.reportQuarter;
+  const week = state.ui.reportWeek;
+  const updateLabel = weeklyReportLabel(getWeeklyReportDate());
+  const requestSummary = requestBreakdown();
+  const offerings = summary.averageOffering;
+  const prevQuarter = state.ui.reportQuarter === 1 ? 4 : state.ui.reportQuarter - 1;
+  const prevYear = state.ui.reportQuarter === 1 ? state.ui.reportYear - 1 : state.ui.reportYear;
+  const prevQuarterData = getDashboardQuarterReportData(prevYear, prevQuarter);
+  const prevAvgOffering = prevQuarterData.length ? Math.round(prevQuarterData.reduce((sum, item) => sum + item.offering, 0) / prevQuarterData.length) : 0;
+  const offerDelta = offerings >= prevAvgOffering ? 'up' : 'down';
+  const offerDiff = prevAvgOffering > 0 ? Math.round(((offerings - prevAvgOffering) / prevAvgOffering) * 100) : null;
+  const memberActivity = summary.averageEnrolled;
+  const prevMemberActivity = prevQuarterData.length ? Math.round(prevQuarterData.reduce((sum, item) => sum + item.enrolled, 0) / prevQuarterData.length) : 0;
+  const memberDelta = prevMemberActivity > 0 ? Math.round(((memberActivity - prevMemberActivity) / prevMemberActivity) * 100) : null;
+  const memberDeltaClass = memberDelta === null ? 'up' : memberDelta >= 0 ? 'up' : 'down';
+  const memberDeltaLabel = memberDelta === null ? '—' : `${memberDelta >= 0 ? '+' : ''}${memberDelta}% vs T${prevQuarter} ${prevYear}`;
+  const prevLabel = `T${prevQuarter} ${prevYear}`;
+  const yearOptions = getDashboardYearOptions();
+
   return `
-    <section class="grid cards">
-      ${metricCard("Membros ativos", summary.members, "Cadastro principal e classes")}
-      ${metricCard("Presença média", `${summary.attendance}%`, "Últimos registos da classe")}
-      ${metricCard("Lições registadas", summary.lessons, "Período corrente")}
-      ${metricCard("Notificações", summary.messages, "Mensagens e avisos")}
-    </section>
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Próximo Sábado</h2>
-            </div>
-          <span class="chip alt">${formatDate(state.ui.programDate)}</span>
-        </div>
-        <div class="list">
-          ${programsForDate(state.ui.programDate)
-            .map(
-              (item) => `
-              <div class="row" style="grid-template-columns: 82px minmax(0,1.8fr) 1fr 1fr;">
-                <strong>${escapeHTML(item.time)}</strong>
-                <div>
-                  <strong>${escapeHTML(item.activity)}</strong>
-                  <div class="note">${escapeHTML(item.note || "Sem observações")}</div>
-                </div>
-                <span>${escapeHTML(item.responsible)}</span>
-                <span class="chip gray">${escapeHTML(className(item.classId))}</span>
-              </div>
-            `
-            )
-            .join("") || `<div class="muted-box">Nenhum item publicado para esta data.</div>`}
-        </div>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Classe em Destaque</h2>
-            </div>
-        </div>
-        <div class="ranking">
-          ${rankingRows("quarter")
-            .slice(0, 4)
-            .map(
-              (item, index) => `
-                <div class="ranking-item">
-                  <strong>#${index + 1}</strong>
-                  <div>
-                    <strong>${escapeHTML(item.name)}</strong>
-                    <div class="note">Presença ${item.score.attendance}% · Lição ${item.score.lesson}% · Participação ${item.score.participation}%</div>
-                    <div class="progress"><span style="width:${item.weighted}%"></span></div>
-                  </div>
-                  <strong>${item.weighted}</strong>
-                </div>
-              `
-            )
-            .join("")}
-        </div>
-      </div>
-    </section>
-    <section class="panel">
-      <div class="section-header">
-        <div>
-          <h2>Status rápido</h2>
+    <style>
+      .dashboard-wrap{font-family:'Source Sans 3',sans-serif;color:#1B2A45;background:transparent;}
+      .dashboard-wrap .wrap{max-width:1180px;margin:0 auto;}
+      .dashboard-wrap header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #1B2A45;}
+      .dashboard-wrap .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#C79A3E;font-weight:600;margin-bottom:6px;}
+      .dashboard-wrap h1{font-family:'Fraunces',serif;font-weight:600;font-size:32px;margin:0;line-height:1.1;}
+      .dashboard-wrap .top-meta{text-align:right;font-size:13px;color:#3C4E6E;line-height:1.5;}
+      .dashboard-wrap .top-meta strong{color:#1B2A45;}
+      .dashboard-wrap .filters{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:20px;}
+      .dashboard-wrap .filters .field{min-width:160px;}
+      .dashboard-wrap .filters label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#3C4E6E;margin-bottom:6px;}
+      .dashboard-wrap .filters select{width:100%;padding:10px 12px;border:1px solid #E4DCC9;border-radius:8px;background:#fff;color:#1B2A45;font-size:14px;}
+      .dashboard-wrap .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;}
+      .dashboard-wrap .card{background:#fff;border:1px solid #E4DCC9;border-radius:6px;padding:22px 22px 18px;position:relative;overflow:hidden;}
+      .dashboard-wrap .card.wide{grid-column:span 2;}
+      .dashboard-wrap .card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+      .dashboard-wrap .card-title{font-family:'Fraunces',serif;font-size:17px;font-weight:600;margin:0 0 3px;}
+      .dashboard-wrap .card-sub{font-size:12.5px;color:#3C4E6E;}
+      .dashboard-wrap .kpi{text-align:right;}
+      .dashboard-wrap .kpi .num{font-family:'Fraunces',serif;font-size:26px;font-weight:700;display:block;line-height:1;}
+      .dashboard-wrap .kpi .delta{font-size:12px;font-weight:600;display:inline-block;margin-top:5px;padding:2px 7px;border-radius:20px;}
+      .dashboard-wrap .delta.up{background:#DCE8DC;color:#5C7F5E;}
+      .dashboard-wrap .delta.down{background:#F0DCD1;color:#A15A3E;}
+      .dashboard-wrap .chart-box{position:relative;height:190px;background:#F8F5EE;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#7A7A7A;font-size:14px;text-transform:uppercase;letter-spacing:.08em;}
+      .dashboard-wrap .chart-box.short{height:150px;}
+      .dashboard-wrap .legend-row{display:flex;gap:16px;margin-top:10px;font-size:12px;color:#3C4E6E;flex-wrap:wrap;}
+      .dashboard-wrap .legend-row span{display:flex;align-items:center;gap:6px;}
+      .dashboard-wrap .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+      .dashboard-wrap .foot-note{margin-top:8px;font-size:12px;color:#3C4E6E;border-top:1px dashed #E4DCC9;padding-top:10px;}
+      .dashboard-wrap .class-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+      .dashboard-wrap .class-table th{text-align:left;font-weight:600;color:#3C4E6E;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-bottom:8px;border-bottom:1px solid #E4DCC9;}
+      .dashboard-wrap .class-table td{padding:9px 0;border-bottom:1px solid #E4DCC9;}
+      .dashboard-wrap .class-table tr:last-child td{border-bottom:none;}
+      .dashboard-wrap .bar-track{background:#DCE8DC;border-radius:20px;height:7px;width:100%;overflow:hidden;}
+      .dashboard-wrap .bar-fill{background:#5C7F5E;height:100%;border-radius:20px;}
+      .dashboard-wrap .bar-fill.gold{background:#C79A3E;}
+      .dashboard-wrap .bar-fill.clay{background:#A15A3E;}
+      .dashboard-wrap .signature{font-family:'Fraunces',serif;font-style:italic;color:#3C4E6E;text-align:center;font-size:13px;margin-top:34px;}
+      @media (max-width:760px){.dashboard-wrap .card.wide{grid-column:span 1;}}
+    </style>
+    <div class="dashboard-wrap">
+      <div class="wrap">
+        <header class="top">
+          <div class="top-meta">
+            ${quarter}º Trimestre ${state.ui.reportYear} · <strong>Semana ${week} de 13</strong><br>
+            Atualizado em ${escapeHTML(updateLabel)}
           </div>
+        </header>
+        <div class="filters">
+          <div class="field">
+            <label for="dashboardQuarter">Trimestre</label>
+            <select id="dashboardQuarter" data-action="report-quarter">
+              ${[1, 2, 3, 4]
+                .map((value) => `<option value="${value}" ${state.ui.reportQuarter === value ? "selected" : ""}>${value}</option>`)
+                .join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label for="dashboardWeek">Sábado</label>
+            <select id="dashboardWeek" data-action="report-week">
+              ${Array.from({ length: 13 }, (_, index) => index + 1)
+                .map((value) => `<option value="${value}" ${state.ui.reportWeek === value ? "selected" : ""}>${value}</option>`)
+                .join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label for="dashboardYear">Ano</label>
+            <select id="dashboardYear" data-action="report-year">
+              ${yearOptions
+                .map((item) => `<option value="${item.value}" ${state.ui.reportYear === item.value ? "selected" : ""}>${item.label}</option>`)
+                .join("")}
+            </select>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="card wide">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Crescimento de Membros</p>
+                <p class="card-sub">Média de matriculados por sábado</p>
+              </div>
+              <div class="kpi">
+                <span class="num">${memberActivity}</span>
+                <span class="delta ${memberDeltaClass}">${memberDeltaLabel}</span>
+              </div>
+            </div>
+            <div class="chart-box"><canvas id="chartMembros"></canvas></div>
+            <div class="legend-row">
+              <span><i class="dot" style="background:#5C7F5E"></i> Presentes</span>
+              <span><i class="dot" style="background:#A15A3E"></i> Matriculados</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Frequência Geral</p>
+                <p class="card-sub">Média de presença por sábado</p>
+              </div>
+              <div class="kpi">
+                <span class="num">${summary.attendance}%</span>
+                <span class="delta ${summary.attendance >= 75 ? 'up' : 'down'}">${summary.attendance >= 75 ? '+' : '-'}${Math.abs(75 - summary.attendance)}% vs trim. anterior</span>
+              </div>
+            </div>
+            <div class="chart-box short"><canvas id="chartFrequencia"></canvas></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Estudo da Lição</p>
+                <p class="card-sub">Média de lições estudadas por sábado</p>
+              </div>
+              <div class="kpi">
+                <span class="num">${summary.averageStudiedLesson}</span>
+                <span class="delta up">média dos 13 sábados</span>
+              </div>
+            </div>
+            <div class="chart-box short"><canvas id="chartLicao"></canvas></div>
+            <div class="legend-row">
+              <span><i class="dot" style="background:#5C7F5E"></i> Lição estudada</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Trimensários</p>
+                <p class="card-sub">Requisitados vs distribuídos por classe</p>
+              </div>
+              <div class="kpi">
+                <span class="num">${requestSummary}</span>
+                <span class="delta down">pendentes</span>
+              </div>
+            </div>
+            <table class="class-table">
+              <tr><th>Classe</th><th>Requisitados</th><th>Distribuídos</th></tr>
+              ${getQuarterlyRequestTotalsByClass(state.ui.requestQuarter)
+                .map(
+                  (item) => `
+                    <tr>
+                      <td>${escapeHTML(item.className)}</td>
+                      <td>${item.requested}</td>
+                      <td>${item.distributed}</td>
+                    </tr>
+                  `
+                )
+                .join('')}
+            </table>
+            <p class="foot-note">${(() => {
+              const totals = getQuarterlyRequestTotalsByClass(state.ui.requestQuarter);
+              const topPending = totals.slice().sort((a, b) => b.pending - a.pending)[0];
+              return topPending && topPending.pending > 0
+                ? `${escapeHTML(topPending.className)} tem o maior número de pendências este trimestre.`
+                : 'Nenhuma pendência registada por classe neste trimestre.';
+            })()}</p>
+          </div>
+
+          <div class="card wide">
+            <div class="card-head">
+              <div>
+                <p class="card-title">Ofertas</p>
+                <p class="card-sub">Média por sábado no trimestre atual</p>
+              </div>
+              <div class="kpi">
+                <span class="num">${offerings.toFixed(0)} MZN</span>
+                <span class="delta ${offerDelta}">${offerDiff === null ? '—' : `${offerDelta === 'up' ? '+' : '-'}${Math.abs(offerDiff)}%`} vs ${prevLabel}</span>
+              </div>
+            </div>
+            <div class="chart-box"><canvas id="chartOfertas"></canvas></div>
+            <div class="legend-row">
+              <span><i class="dot" style="background:#C79A3E"></i> Trimestre atual</span>
+              <span><i class="dot" style="background:#E7CE95"></i> Trimestre anterior</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="signature">"Onde estiverem dois ou três reunidos em meu nome, aí estou eu no meio deles."</p>
       </div>
-      <div class="grid three">
-        ${statusBox("Membros por classe", classBreakdown())}
-        ${statusBox("Requisições do trimestre", requestBreakdown())}
-        ${statusBox("Mensagens recentes", recentMessages())}
-      </div>
-    </section>
+    </div>
   `;
+}
+
+function initializeDashboardCharts() {
+  if (state.ui.view !== 'dashboard' || typeof Chart !== 'function') return;
+
+  const destroyChart = (id) => {
+    const chart = Chart.getChart(id);
+    if (chart) chart.destroy();
+  };
+
+  destroyChart('chartMembros');
+  destroyChart('chartFrequencia');
+  destroyChart('chartLicao');
+  destroyChart('chartOfertas');
+
+  const noBorderGrid = (axis) => ({
+    grid: { color: '#E4DCC9', display: axis === 'y' },
+    ticks: { font: { size: 11 } },
+    border: { display: false },
+  });
+
+  const summary = buildDashboard();
+  const labels = summary.quarterData.map((item) => `S${item.week}`);
+  const attendanceData = summary.quarterData.map((item) => item.attendancePct);
+  const presentData = summary.quarterData.map((item) => item.present + item.visits);
+  const enrolledData = summary.quarterData.map((item) => item.enrolled);
+  const offeringData = summary.quarterData.map((item) => item.offering);
+
+  const prevQuarter = state.ui.reportQuarter === 1 ? 4 : state.ui.reportQuarter - 1;
+  const prevYear = state.ui.reportQuarter === 1 ? state.ui.reportYear - 1 : state.ui.reportYear;
+  const prevQuarterData = getDashboardQuarterReportData(prevYear, prevQuarter);
+  const prevOfferingData = prevQuarterData.map((item) => item.offering);
+
+  const ctxMembros = document.getElementById('chartMembros');
+  if (ctxMembros) {
+    new Chart(ctxMembros, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Presentes',
+            data: presentData,
+            borderColor: '#5C7F5E',
+            backgroundColor: 'rgba(92,127,94,0.16)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 3,
+            pointBackgroundColor: '#5C7F5E',
+          },
+          {
+            label: 'Matriculados',
+            data: enrolledData,
+            borderColor: '#A15A3E',
+            backgroundColor: 'transparent',
+            borderDash: [4, 3],
+            tension: 0.35,
+            pointRadius: 3,
+            pointBackgroundColor: '#A15A3E',
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: noBorderGrid('x'), y: noBorderGrid('y') },
+      },
+    });
+  }
+
+  const ctxFrequencia = document.getElementById('chartFrequencia');
+  if (ctxFrequencia) {
+    new Chart(ctxFrequencia, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            data: attendanceData,
+            backgroundColor: '#C79A3E',
+            borderRadius: 4,
+            maxBarThickness: 22,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: noBorderGrid('x'),
+          y: { ...noBorderGrid('y'), min: 0, max: 100, ticks: { callback: (v) => `${v}%`, font: { size: 11 } } },
+        },
+      },
+    });
+  }
+
+  const ctxLicao = document.getElementById('chartLicao');
+  if (ctxLicao) {
+    const lessonData = summary.quarterData.map((item) => item.studiedLesson);
+    new Chart(ctxLicao, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Lições estudadas',
+            data: lessonData,
+            backgroundColor: '#5C7F5E',
+            borderRadius: 4,
+            maxBarThickness: 18,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: noBorderGrid('x'),
+          y: { ...noBorderGrid('y'), min: 0, ticks: { font: { size: 11 } } },
+        },
+      },
+    });
+  }
+
+  const ctxOfertas = document.getElementById('chartOfertas');
+  if (ctxOfertas) {
+    new Chart(ctxOfertas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: `${state.ui.reportQuarter}T ${state.ui.reportYear}`,
+            data: offeringData,
+            backgroundColor: '#C79A3E',
+            borderRadius: 4,
+            maxBarThickness: 16,
+          },
+          {
+            label: `${prevQuarter}T ${prevYear}`,
+            data: prevOfferingData,
+            backgroundColor: '#E7CE95',
+            borderRadius: 4,
+            maxBarThickness: 16,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: noBorderGrid('x'), y: noBorderGrid('y') },
+      },
+    });
+  }
 }
 
 function buildDashboard() {
   const memberCount = state.members.filter((m) => m.active).length;
-  const allAttendance = state.attendance.reduce((acc, session) => acc + session.entries.filter((e) => e.status === "presente").length, 0);
-  const allSlots = state.attendance.reduce((acc, session) => {
-    const classMembers = state.members.filter((m) => m.classId === session.classId && m.active).length || 1;
-    return acc + classMembers;
-  }, 0) || 1;
+  const quarter = `${state.ui.reportYear}-T${state.ui.reportQuarter}`;
+  const quarterData = getDashboardQuarterReportData(state.ui.reportYear, state.ui.reportQuarter);
+  const attendance = Math.round(quarterData.reduce((sum, item) => sum + item.attendancePct, 0) / quarterData.length) || 0;
+  const totalStudiedLesson = quarterData.reduce((sum, item) => sum + item.studiedLesson, 0);
+  const averageStudiedLesson = quarterData.length ? Math.round(totalStudiedLesson / quarterData.length) : 0;
+  const totalEnrolled = quarterData.reduce((sum, item) => sum + item.enrolled, 0);
+  const averageEnrolled = quarterData.length ? Math.round(totalEnrolled / quarterData.length) : 0;
+  const memberActivityTotal = quarterData.reduce((sum, item) => sum + item.attendedWithVisits + item.enrolled, 0);
+  const averageMemberActivity = quarterData.length ? Math.round(memberActivityTotal / quarterData.length) : 0;
+  const totalOffering = quarterData.reduce((sum, item) => sum + item.offering, 0);
+  const averageOffering = quarterData.length ? Math.round(totalOffering / quarterData.length) : 0;
+
   return {
     members: memberCount,
-    attendance: Math.round((allAttendance / allSlots) * 100) || 0,
-    lessons: state.lessons.length,
+    attendance,
+    averageStudiedLesson,
+    totalStudiedLesson,
+    averageEnrolled,
+    averageMemberActivity,
     messages: state.messages.length,
+    totalOffering,
+    averageOffering,
+    quarterData,
   };
 }
 
@@ -686,9 +1085,57 @@ function classBreakdown() {
 }
 
 function requestBreakdown() {
-  const pending = state.quarterlyRequests.filter((req) => req.status === "Pendente").length;
-  const sent = state.quarterlyRequests.filter((req) => req.status === "Enviado").length;
+  const pending = state.quarterlyRequests
+    .filter((req) => req.status === "Pendente")
+    .reduce((sum, req) => sum + (req.quantity || 0), 0);
+  const sent = state.quarterlyRequests
+    .filter((req) => req.status === "Enviado")
+    .reduce((sum, req) => sum + (req.quantity || 0), 0);
   return `${pending} pendentes · ${sent} enviados`;
+}
+
+function getQuarterlyRequestTotalsByClass(quarter) {
+  return state.classes.map((klass) => {
+    const classRequests = state.quarterlyRequests.filter(
+      (req) => req.quarter === quarter && req.classId === klass.id
+    );
+    return {
+      classId: klass.id,
+      className: klass.name,
+      requested: classRequests.reduce((sum, req) => sum + (req.quantity || 0), 0),
+      distributed: classRequests
+        .filter((req) => req.status === "Enviado")
+        .reduce((sum, req) => sum + (req.quantity || 0), 0),
+      pending: classRequests
+        .filter((req) => req.status === "Pendente")
+        .reduce((sum, req) => sum + (req.quantity || 0), 0),
+    };
+  });
+}
+
+function getDashboardQuarterReportData(year, quarter) {
+  return Array.from({ length: 13 }, (_, index) => {
+    const week = index + 1;
+    const date = getWeeklyReportDateForQuarterWeek(year, quarter, week);
+    const report = state.weeklyReports.find((item) => item.date === date);
+    const totals = report ? reportTotals(report) : { enrolled: 0, present: 0, visits: 0, studiedLesson: 0, offering: 0 };
+    return {
+      week,
+      date,
+      enrolled: totals.enrolled,
+      present: totals.present,
+      visits: totals.visits,
+      studiedLesson: totals.studiedLesson,
+      offering: totals.offering,
+      attendedWithVisits: totals.present + totals.visits,
+      attendancePct: totals.enrolled ? Math.round(((totals.present + totals.visits) / totals.enrolled) * 100) : 0,
+    };
+  });
+}
+
+function getDashboardYearOptions() {
+  const current = state.ui.reportYear;
+  return [current - 1, current, current + 1].map((year) => ({ value: year, label: `${year}` }));
 }
 
 function recentMessages() {
@@ -699,105 +1146,6 @@ function className(classId) {
   return state.classes.find((klass) => klass.id === classId)?.name || "Sem classe";
 }
 
-function membersView() {
-  const members = visibleMembers();
-  const classFilter = state.ui.memberFilterClass;
-  const filtered = classFilter === "all" ? members : members.filter((item) => item.classId === classFilter);
-  const editing = state.members.find((item) => item.id === state.ui.editMemberId) || null;
-
-  return `
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>${editing ? "Editar membro" : "Novo membro"}</h2>
-            </div>
-        </div>
-        <form id="memberForm" class="form-grid">
-          <div class="form-grid two">
-            <div class="field">
-              <label for="memberName">Nome</label>
-              <input id="memberName" name="name" value="${escapeHTML(editing?.name || "")}" required />
-            </div>
-            <div class="field">
-              <label for="memberContact">Contacto</label>
-              <input id="memberContact" name="contact" value="${escapeHTML(editing?.contact || "")}" />
-            </div>
-          </div>
-          <div class="form-grid three">
-            <div class="field">
-              <label for="memberClass">Classe</label>
-              <select id="memberClass" name="classId" required>
-                ${state.classes
-                  .map(
-                    (klass) =>
-                      `<option value="${klass.id}" ${editing?.classId === klass.id ? "selected" : ""}>${escapeHTML(klass.name)}</option>`
-                  )
-                  .join("")}
-              </select>
-            </div>
-            <div class="field">
-              <label for="memberJoined">Data de ingresso</label>
-              <input id="memberJoined" name="joinedAt" type="date" value="${escapeHTML(editing?.joinedAt || todayISO())}" required />
-            </div>
-            <div class="field">
-              <label for="memberActive">Estado</label>
-              <select id="memberActive" name="active">
-                <option value="true" ${editing?.active !== false ? "selected" : ""}>Activo</option>
-                <option value="false" ${editing?.active === false ? "selected" : ""}>Inactivo</option>
-              </select>
-            </div>
-          </div>
-          <div class="toolbar">
-            <button class="btn primary" type="submit">${icon("save")} ${editing ? "Actualizar" : "Cadastrar"}</button>
-            ${editing ? `<button class="btn" type="button" data-action="cancel-member-edit">Cancelar</button>` : ""}
-          </div>
-        </form>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Filtros e resumo</h2>
-            </div>
-        </div>
-        <div class="form-grid">
-          <div class="field">
-            <label for="memberFilterClass">Filtrar classe</label>
-            <select id="memberFilterClass" data-action="member-filter">
-              <option value="all">Todas</option>
-              ${state.classes
-                .map((klass) => `<option value="${klass.id}" ${classFilter === klass.id ? "selected" : ""}>${escapeHTML(klass.name)}</option>`)
-                .join("")}
-            </select>
-          </div>
-        </div>
-        <div class="list">
-          ${filtered
-            .map(
-              (member) => `
-              <div class="row" style="grid-template-columns: minmax(0,1.6fr) repeat(3, minmax(0, 1fr));">
-                <div>
-                  <strong>${escapeHTML(member.name)}</strong>
-                  <div class="note">${escapeHTML(member.contact || "Sem contacto")}</div>
-                </div>
-                <span class="chip gray">${escapeHTML(className(member.classId))}</span>
-                <span>${formatDate(member.joinedAt)}</span>
-                <span class="status ${member.active ? "ok" : "bad"}">${member.active ? "Activo" : "Inactivo"}</span>
-                <div class="toolbar">
-                  <button type="button" class="btn" data-action="edit-member" data-id="${member.id}">${icon("edit")} Editar</button>
-                  <button type="button" class="btn ${member.active ? "danger" : "primary"}" data-action="toggle-member" data-id="${member.id}">
-                    ${member.active ? "Desactivar" : "Activar"}
-                  </button>
-                </div>
-              </div>
-            `
-            )
-            .join("") || `<div class="muted-box">Sem membros nesta classe.</div>`}
-        </div>
-      </div>
-    </section>
-  `;
-}
 
 function attendanceView() {
   const classId = state.ui.attendanceClassId === "all" ? state.classes[0]?.id || "classe-01-adultos" : state.ui.attendanceClassId;
@@ -1026,7 +1374,7 @@ function requestsView() {
               </select>
             </div>
             <div class="field">
-              <label for="requestQuantity">Quantidade</label>
+              <label for="requestQuantity">Lições requisitadas</label>
               <input id="requestQuantity" name="quantity" type="number" min="0" value="10" required />
             </div>
           </div>
@@ -1061,7 +1409,7 @@ function requestsView() {
                   <strong>${escapeHTML(className(request.classId))}</strong>
                   <span class="status ${request.status === "Enviado" ? "ok" : "warn"}">${escapeHTML(request.status)}</span>
                 </div>
-                <div class="note">${request.quantity} trimestrais · ${formatDate(request.createdAt)}</div>
+                <div class="note">${request.quantity} trimensários · ${formatDate(request.createdAt)}</div>
               </div>
             `
             )
@@ -1225,7 +1573,80 @@ function rankingView() {
 }
 
 function reportsView() {
-  const result = buildReport(state.ui.reportType, state.ui.reportPeriod, state.ui.reportClassId);
+  const reportType = "attendance";
+  const reportPeriod = "quarter";
+  const reportClassId = "all";
+  const result = buildReport(reportType, reportPeriod, reportClassId);
+  const year = state.ui.reportYear;
+  const quarter = state.ui.reportQuarter;
+  const week = state.ui.reportWeek;
+  const period = reportPeriod;
+  const weekDate = getReportDateForQuarterWeek(year, quarter, week);
+  const weeklyExisting = state.weeklyReports.find((item) => item.date === weekDate) || null;
+  const weeklyReport = buildWeeklyReportFromReport(weeklyExisting || { date: weekDate, classes: reportRowsFromReport(null) });
+  const quarterSummary = quarterSummaryForDate(weekDate);
+  // build competitive rows depending on selected period
+  let competitiveRows = [];
+  if (period === "week") {
+    competitiveRows = reportRowsFromReport(weeklyReport);
+  } else if (period === "quarter") {
+    const reports = state.weeklyReports.filter((item) => reportQuarterForDate(item.date) === getQuarterKey(year, quarter));
+    const count = reports.length || 1;
+    competitiveRows = state.classes.map((klass) => {
+      const totals = reports.reduce(
+        (acc, r) => {
+          const row = (r.classes || []).find((c) => c.classId === klass.id) || makeEmptyReportClassRow(klass.id);
+          acc.enrolled += Number(row.enrolled || 0);
+          acc.present += Number(row.present || 0);
+          acc.visits += Number(row.visits || 0);
+          acc.studiedLesson += Number(row.studiedLesson || 0);
+          acc.offering += Number(row.offering || 0);
+          return acc;
+        },
+        { enrolled: 0, present: 0, visits: 0, studiedLesson: 0, offering: 0 }
+      );
+      return {
+        classId: klass.id,
+        enrolled: totals.enrolled,
+        present: totals.present,
+        visits: totals.visits,
+        studiedLesson: totals.studiedLesson,
+        offering: totals.offering,
+        avgEnrolled: Math.round(totals.enrolled / count),
+        avgPresent: Math.round(totals.present / count),
+        count,
+      };
+    });
+  } else if (period === "year") {
+    const reports = state.weeklyReports.filter((item) => new Date(`${item.date}T00:00:00`).getFullYear() === year);
+    const count = reports.length || 1;
+    competitiveRows = state.classes.map((klass) => {
+      const totals = reports.reduce(
+        (acc, r) => {
+          const row = (r.classes || []).find((c) => c.classId === klass.id) || makeEmptyReportClassRow(klass.id);
+          acc.enrolled += Number(row.enrolled || 0);
+          acc.present += Number(row.present || 0);
+          acc.visits += Number(row.visits || 0);
+          acc.studiedLesson += Number(row.studiedLesson || 0);
+          acc.offering += Number(row.offering || 0);
+          return acc;
+        },
+        { enrolled: 0, present: 0, visits: 0, studiedLesson: 0, offering: 0 }
+      );
+      return {
+        classId: klass.id,
+        enrolled: totals.enrolled,
+        present: totals.present,
+        visits: totals.visits,
+        studiedLesson: totals.studiedLesson,
+        offering: totals.offering,
+        avgEnrolled: Math.round(totals.enrolled / count),
+        avgPresent: Math.round(totals.present / count),
+        count,
+      };
+    });
+  }
+
   return `
     <section class="grid two">
       <div class="panel">
@@ -1234,34 +1655,29 @@ function reportsView() {
             <h2>Filtros de relatório</h2>
             </div>
         </div>
-        <form id="reportForm" class="form-grid">
+        <form id="reportFilterForm" class="form-grid">
           <div class="form-grid three">
             <div class="field">
-              <label for="reportType">Tipo</label>
-              <select id="reportType" name="reportType">
-                <option value="attendance" ${state.ui.reportType === "attendance" ? "selected" : ""}>Presenças</option>
-                <option value="lessons" ${state.ui.reportType === "lessons" ? "selected" : ""}>Lições</option>
-                <option value="visitors" ${state.ui.reportType === "visitors" ? "selected" : ""}>Visitantes</option>
-                <option value="ranking" ${state.ui.reportType === "ranking" ? "selected" : ""}>Classe em destaque</option>
+              <label for="reportYear">Ano</label>
+              <select id="reportYear" name="reportYear">
+                ${getDashboardYearOptions()
+                  .map((item) => `<option value="${item.value}" ${state.ui.reportYear === item.value ? "selected" : ""}>${item.label}</option>`)
+                  .join("")}
               </select>
             </div>
             <div class="field">
-              <label for="reportPeriod">Período</label>
-              <select id="reportPeriod" name="reportPeriod">
-                <option value="week" ${state.ui.reportPeriod === "week" ? "selected" : ""}>Sábado específico</option>
-                <option value="quarter" ${state.ui.reportPeriod === "quarter" ? "selected" : ""}>Trimestre</option>
-                <option value="year" ${state.ui.reportPeriod === "year" ? "selected" : ""}>Ano</option>
+              <label for="reportQuarter">Trimestre</label>
+              <select id="reportQuarter" name="reportQuarter">
+                ${[1, 2, 3, 4]
+                  .map((value) => `<option value="${value}" ${state.ui.reportQuarter === value ? "selected" : ""}>${value}</option>`)
+                  .join("")}
               </select>
             </div>
             <div class="field">
-              <label for="reportClassId">Classe</label>
-              <select id="reportClassId" name="reportClassId">
-                <option value="all" ${state.ui.reportClassId === "all" ? "selected" : ""}>Todas</option>
-                ${state.classes
-                  .map(
-                    (klass) =>
-                      `<option value="${klass.id}" ${state.ui.reportClassId === klass.id ? "selected" : ""}>${escapeHTML(klass.name)}</option>`
-                  )
+              <label for="reportWeek">Sábado</label>
+              <select id="reportWeek" name="reportWeek">
+                ${Array.from({ length: 13 }, (_, index) => index + 1)
+                  .map((value) => `<option value="${value}" ${state.ui.reportWeek === value ? "selected" : ""}>${value}</option>`)
                   .join("")}
               </select>
             </div>
@@ -1272,32 +1688,70 @@ function reportsView() {
           </div>
         </form>
       </div>
-      <div class="panel" id="reportOutput">
+    </section>
+
+    <section class="grid two">
+      <div class="panel">
         <div class="section-header">
           <div>
-            <h2>Resultado</h2>
+            <h2>Quadro comparativo</h2>
             </div>
-          <span class="chip alt">${escapeHTML(result.periodLabel)}</span>
+          <span class="chip alt">${period === "week" ? weeklyReport.quarter : result.periodLabel}</span>
         </div>
-        <div class="grid three">
-          ${reportMetric("Total", result.total, result.caption)}
-          ${reportMetric("Classe", result.classLabel, "Filtro aplicado")}
-          ${reportMetric("Observação", result.note, "Resumo gerado pelo sistema")}
+        <div class="grid four" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;">
+          ${reportMetric("Matriculados", period === "week" ? weeklyReport.totals.enrolled : (quarterSummary.average.enrolled || result.total), period === "week" ? "Total da escola" : result.caption)}
+          ${reportMetric("Presentes", period === "week" ? weeklyReport.totals.present : (quarterSummary.average.present || "-"), "Pessoas presentes")}
+          ${reportMetric("Visitas", period === "week" ? weeklyReport.totals.visits : (quarterSummary.average.visits || "-"), "Visitantes")}
+          ${reportMetric("Estudaram lição", period === "week" ? weeklyReport.totals.studiedLesson : (quarterSummary.average.studiedLesson || "-"), "Lição concluída")}
+        </div>
+        <div class="grid two" style="margin-top:14px">
+          ${reportMetric("Oferta total", period === "week" ? weeklyReport.totals.offering : (quarterSummary.average.offering || "-"), period === "week" ? "Valor do sábado" : "Média por sábado")}
+          ${reportMetric("Ofertas acumuladas", period === "week" ? weeklyReport.totals.accumulatedOffering || 0 : (quarterSummary.accumulatedOffering || 0), "Acumulado do trimestre")}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="section-header">
+          <div>
+            <h2>Quadro competitivo</h2>
+            </div>
+          <span class="chip alt">${period === "week" ? weeklyReport.date : result.classLabel}</span>
         </div>
         <div class="list" style="margin-top:14px">
-          ${result.rows
-            .map(
-              (row) => `
-              <div class="muted-box">
-                <div class="toolbar wrap">
-                  <strong>${escapeHTML(row.label)}</strong>
-                  <span class="chip gray">${escapeHTML(row.value)}</span>
-                </div>
-                ${row.note ? `<div class="note">${escapeHTML(row.note)}</div>` : ""}
-              </div>
-            `
-            )
-            .join("") || `<div class="muted-box">Sem registos para estes filtros.</div>`}
+          ${competitiveRows && competitiveRows.length
+            ? competitiveRows
+                .map((row) => {
+                  const score = Number(row.present || 0) + Number(row.visits || 0) + Number(row.studiedLesson || 0);
+                  if (period === "week") {
+                    return `
+                      <div class="activity-item">
+                        <div>
+                          <strong>${escapeHTML(className(row.classId))}</strong>
+                          <div class="meta">Matriculados ${row.enrolled} · Presentes ${row.present} · Visitas ${row.visits} · Lição ${row.studiedLesson}</div>
+                        </div>
+                        <div class="stack" style="text-align:right">
+                          <span class="chip">${score} pontos</span>
+                          <span class="note">Oferta ${Number(row.offering || 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    `;
+                  }
+                  // quarter or year aggregated
+                  return `
+                    <div class="activity-item">
+                      <div>
+                        <strong>${escapeHTML(className(row.classId))}</strong>
+                        <div class="meta">Total: ${row.enrolled} matriculados · ${row.present} presentes · ${row.visits} visitas</div>
+                        <div class="note">Média por sábado: ${row.avgEnrolled} matriculados · ${row.avgPresent} presentes · (${row.count} sábados)</div>
+                      </div>
+                      <div class="stack" style="text-align:right">
+                        <span class="chip">${score} pontos</span>
+                        <span class="note">Oferta ${Number(row.offering || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  `;
+                })
+                .join("")
+            : `<div class="muted-box">Sem dados para este período.</div>`}
         </div>
       </div>
     </section>
@@ -1316,11 +1770,31 @@ function reportMetric(title, value, caption) {
 
 function buildReport(type, period, classId) {
   const classLabel = classId === "all" ? "Todas" : className(classId);
-  const startDate = period === "week" ? todayISO(-7) : period === "quarter" ? quarterStartISO() : null;
-  const periodLabel = { week: "Sábado específico", quarter: "Trimestral", year: "Anual" }[period];
+  const year = state.ui.reportYear;
+  const quarter = state.ui.reportQuarter;
+  const week = state.ui.reportWeek;
+  const quarterKey = getQuarterKey(year, quarter);
+  const weekDate = getReportDateForQuarterWeek(year, quarter, week);
+  const periodLabel =
+    period === "week"
+      ? `Sábado ${week} · T${quarter} ${year}`
+      : period === "quarter"
+      ? `Trimestre ${quarter} ${year}`
+      : `Ano ${year}`;
+
+  const matchesPeriod = (date) => {
+    if (period === "week") return date === weekDate;
+    if (period === "quarter") return reportQuarterForDate(date) === quarterKey;
+    if (period === "year") return new Date(`${date}T00:00:00`).getFullYear() === year;
+    return true;
+  };
+
+  const matchesClass = (itemClassId) => classId === "all" || itemClassId === classId;
 
   if (type === "attendance") {
-    const sessions = state.attendance.filter((session) => (!classId || classId === "all" || session.classId === classId) && (!startDate || session.date >= startDate));
+    const sessions = state.attendance.filter(
+      (session) => matchesClass(session.classId) && matchesPeriod(session.date)
+    );
     return {
       title: "Relatório de presenças",
       periodLabel,
@@ -1337,7 +1811,9 @@ function buildReport(type, period, classId) {
   }
 
   if (type === "lessons") {
-    const lessons = state.lessons.filter((lesson) => (!classId || classId === "all" || lesson.classId === classId) && (!startDate || lesson.date >= startDate));
+    const lessons = state.lessons.filter(
+      (lesson) => matchesClass(lesson.classId) && matchesPeriod(lesson.date)
+    );
     return {
       title: "Relatório de lições",
       periodLabel,
@@ -1354,7 +1830,9 @@ function buildReport(type, period, classId) {
   }
 
   if (type === "visitors") {
-    const sessions = state.attendance.filter((session) => (!classId || classId === "all" || session.classId === classId) && (!startDate || session.date >= startDate));
+    const sessions = state.attendance.filter(
+      (session) => matchesClass(session.classId) && matchesPeriod(session.date)
+    );
     const totalVisitors = sessions.reduce((total, session) => total + (session.visitorCount || 0), 0);
     return {
       title: "Relatório de visitantes",
@@ -1371,7 +1849,7 @@ function buildReport(type, period, classId) {
     };
   }
 
-  const rows = rankingRows(period).filter((row) => classId === "all" || row.id === classId);
+  const rows = rankingRows(period, year, quarter, week).filter((row) => classId === "all" || row.id === classId);
   return {
     title: "Relatório de classe em destaque",
     periodLabel,
@@ -1484,6 +1962,7 @@ function targetLabel(target, classId) {
 
 function render() {
   app.innerHTML = state.session ? shellView() : loginView();
+  initializeDashboardCharts();
   wireEvents();
 }
 
@@ -1493,13 +1972,41 @@ function wireEvents() {
     loginForm.addEventListener("submit", handleLogin);
   }
 
+  const togglePasswordButton = document.querySelector("[data-action='toggle-password']");
+  if (togglePasswordButton) {
+    togglePasswordButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      const passwordInput = document.getElementById("password");
+      const isPassword = passwordInput.type === "password";
+      passwordInput.type = isPassword ? "text" : "password";
+      togglePasswordButton.innerHTML = isPassword ? icon("eyeOff") : icon("eye");
+    });
+  }
+
   document.querySelectorAll("[data-nav]").forEach((button) => {
     button.addEventListener("click", () => {
       state.ui.view = button.dataset.nav;
+      state.ui.sidebarOpen = false;
       persist();
       render();
     });
   });
+
+  const toggleSidebar = document.querySelector("[data-action='toggle-sidebar']");
+  if (toggleSidebar) {
+    toggleSidebar.addEventListener("click", () => {
+      state.ui.sidebarOpen = !state.ui.sidebarOpen;
+      render();
+    });
+  }
+
+  const closeSidebar = document.querySelector("[data-action='close-sidebar']");
+  if (closeSidebar) {
+    closeSidebar.addEventListener("click", () => {
+      state.ui.sidebarOpen = false;
+      render();
+    });
+  }
 
   document.querySelectorAll("[data-action='logout']").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1602,12 +2109,42 @@ function wireEvents() {
     });
   });
 
-  const reportForm = document.getElementById("reportForm");
-  if (reportForm) reportForm.addEventListener("submit", handleReportSubmit);
+  const reportFilterForm = document.getElementById("reportFilterForm");
+  if (reportFilterForm) reportFilterForm.addEventListener("submit", handleReportFilterSubmit);
 
   document.querySelectorAll("[data-action='print-report']").forEach((button) => {
     button.addEventListener("click", printReport);
   });
+
+  const reportQuarterSelect = document.querySelector("[data-action='report-quarter']");
+  if (reportQuarterSelect) {
+    reportQuarterSelect.addEventListener("change", (event) => {
+      state.ui.reportQuarter = Number(event.target.value);
+      state.ui.reportDate = getWeeklyReportDateForQuarterWeek(state.ui.reportYear, state.ui.reportQuarter, state.ui.reportWeek);
+      persist();
+      render();
+    });
+  }
+
+  const reportYearSelect = document.querySelector("[data-action='report-year']");
+  if (reportYearSelect) {
+    reportYearSelect.addEventListener("change", (event) => {
+      state.ui.reportYear = Number(event.target.value);
+      state.ui.reportDate = getWeeklyReportDateForQuarterWeek(state.ui.reportYear, state.ui.reportQuarter, state.ui.reportWeek);
+      persist();
+      render();
+    });
+  }
+
+  const reportWeekSelect = document.querySelector("[data-action='report-week']");
+  if (reportWeekSelect) {
+    reportWeekSelect.addEventListener("change", (event) => {
+      state.ui.reportWeek = Number(event.target.value);
+      state.ui.reportDate = getWeeklyReportDateForQuarterWeek(state.ui.reportYear, state.ui.reportQuarter, state.ui.reportWeek);
+      persist();
+      render();
+    });
+  }
 
   const messageForm = document.getElementById("messageForm");
   if (messageForm) messageForm.addEventListener("submit", handleMessageSubmit);
@@ -1659,7 +2196,20 @@ function handleMemberSubmit(event) {
     const member = state.members.find((item) => item.id === state.ui.editMemberId);
     if (member) Object.assign(member, payload);
   } else {
-    state.members.push({ id: uid("m"), ...payload });
+    const newMemberId = uid("m");
+    state.members.push({ id: newMemberId, ...payload });
+    
+    // Criar automaticamente um usuário para o novo membro
+    const firstName = payload.name.split(" ")[0].toLowerCase();
+    const newUserId = uid("u");
+    state.users.push({
+      id: newUserId,
+      username: firstName,
+      password: "Membro26",
+      role: "member",
+      name: payload.name,
+      memberId: newMemberId,
+    });
   }
   state.ui.editMemberId = null;
   persist();
@@ -1765,12 +2315,12 @@ function handleSettingsSubmit(event) {
   render();
 }
 
-function handleReportSubmit(event) {
+function handleReportFilterSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
-  state.ui.reportType = form.querySelector("#reportType").value;
-  state.ui.reportPeriod = form.querySelector("#reportPeriod").value;
-  state.ui.reportClassId = form.querySelector("#reportClassId").value;
+  state.ui.reportYear = Number(form.querySelector("#reportYear").value);
+  state.ui.reportQuarter = Number(form.querySelector("#reportQuarter").value);
+  state.ui.reportWeek = Number(form.querySelector("#reportWeek").value);
   persist();
   render();
 }
@@ -1798,37 +2348,130 @@ function handleMessageSubmit(event) {
 }
 
 function printReport() {
-  const report = buildReport(state.ui.reportType, state.ui.reportPeriod, state.ui.reportClassId);
+  const year = state.ui.reportYear;
+  const quarter = state.ui.reportQuarter;
+  const week = state.ui.reportWeek;
+  const period = "quarter";
+  const weekDate = getReportDateForQuarterWeek(year, quarter, week);
+  const weeklyExisting = state.weeklyReports.find((item) => item.date === weekDate) || null;
+  const weeklyReport = buildWeeklyReportFromReport(weeklyExisting || { date: weekDate, classes: reportRowsFromReport(null) });
+  const quarterSummary = quarterSummaryForDate(weekDate);
+  
+  // build competitive rows
+  let competitiveRows = [];
+  const reports = state.weeklyReports.filter((item) => reportQuarterForDate(item.date) === getQuarterKey(year, quarter));
+  const count = reports.length || 1;
+  competitiveRows = state.classes.map((klass) => {
+    const totals = reports.reduce(
+      (acc, r) => {
+        const row = (r.classes || []).find((c) => c.classId === klass.id) || makeEmptyReportClassRow(klass.id);
+        acc.enrolled += Number(row.enrolled || 0);
+        acc.present += Number(row.present || 0);
+        acc.visits += Number(row.visits || 0);
+        acc.studiedLesson += Number(row.studiedLesson || 0);
+        acc.offering += Number(row.offering || 0);
+        return acc;
+      },
+      { enrolled: 0, present: 0, visits: 0, studiedLesson: 0, offering: 0 }
+    );
+    return {
+      classId: klass.id,
+      enrolled: totals.enrolled,
+      present: totals.present,
+      visits: totals.visits,
+      studiedLesson: totals.studiedLesson,
+      offering: totals.offering,
+      avgEnrolled: Math.round(totals.enrolled / count),
+      avgPresent: Math.round(totals.present / count),
+      count,
+    };
+  });
+
+  const periodLabel = `Trimestre ${quarter} ${year}`;
   const html = `
     <html>
       <head>
-        <title>${escapeHTML(report.title)}</title>
+        <title>Relatório - ${periodLabel}</title>
         <style>
           body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#12201d}
-          h1,h2,p{margin:0 0 12px}
-          .box{border:1px solid #c8d6d2;border-radius:12px;padding:12px;margin:12px 0}
-          .muted{color:#58706b}
-          table{width:100%;border-collapse:collapse}
-          td{border-bottom:1px solid #dbe5e1;padding:8px 0;vertical-align:top}
+          h1,h2{margin:24px 0 12px;font-size:1.4rem}
+          h1{border-bottom:2px solid #58706b;padding-bottom:8px}
+          .section{margin-bottom:32px}
+          .metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:12px}
+          .metric{border:1px solid #c8d6d2;border-radius:8px;padding:12px}
+          .metric-label{font-size:0.85rem;color:#58706b;font-weight:600}
+          .metric-value{font-size:1.8rem;font-weight:700;color:#12201d;margin:8px 0}
+          .metric-caption{font-size:0.8rem;color:#58706b}
+          .class-item{border-bottom:1px solid #dbe5e1;padding:12px 0}
+          .class-name{font-weight:600;font-size:1rem}
+          .class-meta{font-size:0.9rem;color:#58706b;margin:4px 0}
+          .class-score{text-align:right;font-weight:600}
+          table{width:100%;border-collapse:collapse;margin-top:12px}
+          td{padding:8px;border-bottom:1px solid #dbe5e1}
+          td:first-child{font-weight:600}
         </style>
       </head>
       <body>
-        <h1>${escapeHTML(report.title)}</h1>
-        <p class="muted">${escapeHTML(report.periodLabel)} · ${escapeHTML(report.classLabel)}</p>
-        <div class="box">
-          <strong>${escapeHTML(report.caption)}</strong>
-          <div>${escapeHTML(report.total)}</div>
-          <div class="muted">${escapeHTML(report.note)}</div>
+        <h1>Relatório - ${periodLabel}</h1>
+        
+        <div class="section">
+          <h2>Quadro comparativo</h2>
+          <div class="metrics">
+            <div class="metric">
+              <div class="metric-label">Matriculados</div>
+              <div class="metric-value">${quarterSummary.average.enrolled || 0}</div>
+              <div class="metric-caption">Total da escola</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Presentes</div>
+              <div class="metric-value">${quarterSummary.average.present || "-"}</div>
+              <div class="metric-caption">Pessoas presentes</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Visitas</div>
+              <div class="metric-value">${quarterSummary.average.visits || "-"}</div>
+              <div class="metric-caption">Visitantes</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Estudaram lição</div>
+              <div class="metric-value">${quarterSummary.average.studiedLesson || "-"}</div>
+              <div class="metric-caption">Lição concluída</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Oferta total</div>
+              <div class="metric-value">${quarterSummary.average.offering || "-"}</div>
+              <div class="metric-caption">Média por sábado</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Ofertas acumuladas</div>
+              <div class="metric-value">${quarterSummary.accumulatedOffering || 0}</div>
+              <div class="metric-caption">Acumulado do trimestre</div>
+            </div>
+          </div>
         </div>
-        <table>
-          ${report.rows
-            .map(
-              (row) => `
-              <tr><td><strong>${escapeHTML(row.label)}</strong><div class="muted">${escapeHTML(row.note || "")}</div></td><td>${escapeHTML(row.value)}</td></tr>
-            `
-            )
-            .join("")}
-        </table>
+
+        <div class="section">
+          <h2>Quadro competitivo</h2>
+          ${competitiveRows && competitiveRows.length
+            ? competitiveRows
+                .map((row) => {
+                  const score = Number(row.present || 0) + Number(row.visits || 0) + Number(row.studiedLesson || 0);
+                  return `
+                    <div class="class-item">
+                      <div class="class-name">${escapeHTML(className(row.classId))}</div>
+                      <div class="class-meta">Total: ${row.enrolled} matriculados · ${row.present} presentes · ${row.visits} visitas</div>
+                      <div class="class-meta">Média por sábado: ${row.avgEnrolled} matriculados · ${row.avgPresent} presentes · (${row.count} sábados)</div>
+                      <table>
+                        <tr><td>Pontuação</td><td class="class-score">${score} pontos</td></tr>
+                        <tr><td>Oferta</td><td class="class-score">${Number(row.offering || 0).toFixed(2)}</td></tr>
+                      </table>
+                    </div>
+                  `;
+                })
+                .join("")
+            : `<div style="color:#58706b">Sem dados para este período.</div>`}
+        </div>
+
         <script>window.onload=()=>{window.print();}</script>
       </body>
     </html>
@@ -1894,183 +2537,6 @@ function metricCard(title, value, caption, view = null) {
   return `<button type="button" class="panel metric soft clickable" data-action="goto" data-view="${view}">${body}</button>`;
 }
 
-function dashboardView() {
-  const summary = buildDashboard();
-  const secretary = isSecretary();
-  const shortcuts = secretary
-    ? [
-        ["members", "Membros"],
-        ["attendance", "Presencas"],
-        ["lessons", "Licoes"],
-        ["requests", "Trimestrais"],
-        ["program", "Programa"],
-        ["reports", "Relatorios"],
-        ["messages", "Mensagens"],
-        ["ranking", "Ranking"],
-      ]
-    : [
-        ["program", "Programa"],
-        ["ranking", "Ranking"],
-        ["reports", "Relatorios"],
-        ["messages", "Mensagens"],
-      ];
-
-  return `
-    <section class="panel dashboard-hero">
-      <div class="section-header">
-        <div>
-          <h2>${secretary ? "Painel da Direcao" : "Painel do Membro"}</h2>
-          </div>
-        <div class="toolbar">
-          <span class="chip alt">${secretary ? "Acesso administrativo" : "Acesso de membro"}</span>
-          <button type="button" class="btn" data-action="goto" data-view="program">${icon("program")} Programa</button>
-          <button type="button" class="btn" data-action="goto" data-view="messages">${icon("messages")} Mensagens</button>
-        </div>
-      </div>
-      <div class="hero-grid">
-        <div class="grid cards">
-          ${metricCard("Membros ativos", summary.members, "Cadastro principal e classes", "members")}
-          ${metricCard("Presenca media", `${summary.attendance}%`, "Ultimos registos da classe", "attendance")}
-          ${metricCard("Licoes registadas", summary.lessons, "Periodo corrente", "lessons")}
-          ${metricCard("Notificacoes", summary.messages, "Mensagens e avisos", "messages")}
-        </div>
-        <div class="muted-box">
-          <strong>Atalhos rapidos</strong>
-          <div class="note" style="margin-top:6px">Abra uma secao sem procurar no menu lateral.</div>
-          <div class="quick-links" style="margin-top:12px">
-            ${shortcuts
-              .map(
-                ([view, label]) => `
-                  <button type="button" class="btn" data-action="goto" data-view="${view}">
-                    ${escapeHTML(label)}
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-        </div>
-      </div>
-    </section>
-        <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Proximo Sabado</h2>
-            </div>
-          <div class="toolbar">
-            <span class="chip alt">${formatDate(state.ui.programDate)}</span>
-            <button type="button" class="btn" data-action="goto" data-view="program">${icon("program")} Gerir</button>
-          </div>
-        </div>
-        <div class="list">
-          ${programsForDate(state.ui.programDate)
-            .map(
-              (item) => `
-              <div class="row" style="grid-template-columns: 82px minmax(0,1.8fr) 1fr 1fr;">
-                <strong>${escapeHTML(item.time)}</strong>
-                <div>
-                  <strong>${escapeHTML(item.activity)}</strong>
-                  <div class="note">${escapeHTML(item.note || "Sem observacoes")}</div>
-                </div>
-                <span>${escapeHTML(item.responsible)}</span>
-                <span class="chip gray">${escapeHTML(className(item.classId))}</span>
-              </div>
-            `
-            )
-            .join("") || `<div class="muted-box">Nenhum item publicado para esta data.</div>`}
-        </div>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Classe em Destaque</h2>
-            </div>
-          <button type="button" class="btn" data-action="goto" data-view="ranking">${icon("ranking")} Abrir ranking</button>
-        </div>
-        <div class="ranking">
-          ${rankingRows("quarter")
-            .slice(0, 4)
-            .map(
-              (item, index) => `
-                <div class="ranking-item">
-                  <strong>#${index + 1}</strong>
-                  <div>
-                    <strong>${escapeHTML(item.name)}</strong>
-                    <div class="note">Presenca ${item.score.attendance}% · Licao ${item.score.lesson}% · Participacao ${item.score.participation}%</div>
-                    <div class="progress"><span style="width:${item.weighted}%"></span></div>
-                  </div>
-                  <strong>${item.weighted}</strong>
-                </div>
-              `
-            )
-            .join("")}
-        </div>
-      </div>
-    </section>
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Resumo por classe</h2>
-            </div>
-          ${secretary ? `<button type="button" class="btn" data-action="goto" data-view="members">${icon("members")} Gerir membros</button>` : ""}
-        </div>
-        <div class="list">
-          ${state.classes
-            .map((klass) => {
-              const sum = getAttendanceSummary(klass.id);
-              return `
-                <div class="activity-item">
-                  <div>
-                    <strong>${escapeHTML(klass.name)}</strong>
-                    <div class="meta">${sum.members} membros activos · ${sum.sessions} presencas registadas · ${sum.visitors} visitantes</div>
-                  </div>
-                  <span class="chip">${sum.rate}%</span>
-                </div>
-              `;
-            })
-            .join("")}
-        </div>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Actividade recente</h2>
-            </div>
-          <button type="button" class="btn" data-action="goto" data-view="reports">${icon("reports")} Relatorios</button>
-        </div>
-        <div class="activity-list">
-          ${recentActivityItems()
-            .map(
-              (item) => `
-                <div class="activity-item">
-                  <div>
-                    <strong>${escapeHTML(item.title)}</strong>
-                    <div class="meta">${escapeHTML(item.meta)}</div>
-                  </div>
-                  <span class="chip gray">${escapeHTML(item.kind)}</span>
-                </div>
-              `
-            )
-            .join("")}
-        </div>
-      </div>
-    </section>
-    <section class="panel">
-      <div class="section-header">
-        <div>
-          <h2>Status rapido</h2>
-          </div>
-      </div>
-      <div class="grid three">
-        ${statusBox("Membros por classe", classBreakdown())}
-        ${statusBox("Requisicoes do trimestre", requestBreakdown())}
-        ${statusBox("Mensagens recentes", recentMessages())}
-      </div>
-    </section>
-  `;
-}
-
 if (!globalThis.__iasdGotoBound) {
   document.addEventListener("click", (event) => {
     const button = event.target.closest?.("[data-action='goto']");
@@ -2086,6 +2552,18 @@ function reportQuarterForDate(dateString) {
   const date = new Date(`${dateString}T00:00:00`);
   const quarter = Math.floor(date.getMonth() / 3) + 1;
   return `${date.getFullYear()}-T${quarter}`;
+}
+
+function reportWeekForDate(dateString) {
+  const date = new Date(`${dateString}T00:00:00`);
+  const quarterKey = reportQuarterForDate(dateString);
+  const [yearString, quarterString] = quarterKey.split("-T");
+  const year = Number(yearString);
+  const quarter = Number(quarterString);
+  const firstSaturday = new Date(firstSaturdayOfQuarter(year, quarter));
+  const diffDays = Math.round((date - firstSaturday) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return 1;
+  return Math.min(13, Math.max(1, Math.floor(diffDays / 7) + 1));
 }
 
 function makeEmptyReportClassRow(classId) {
@@ -2121,6 +2599,12 @@ function reportTotals(report) {
     studiedLesson,
     offering,
   };
+}
+
+function getWeeklyReportDate() {
+  const selectedDate = state.ui.reportDate;
+  if (selectedDate) return selectedDate;
+  return getWeeklyReportDateForQuarterWeek(state.ui.reportYear, state.ui.reportQuarter, state.ui.reportWeek);
 }
 
 function buildWeeklyReportFromReport(report) {
@@ -2184,337 +2668,6 @@ function weeklyReportLabel(dateString) {
   }).format(new Date(`${dateString}T00:00:00`));
 }
 
-function reportsView() {
-  if (!isSecretary()) {
-    return memberReportsView();
-  }
-  const date = state.ui.reportDate || todayISO();
-  const existing = state.weeklyReports.find((item) => item.date === date) || null;
-  const report = buildWeeklyReportFromReport(existing || {
-    date,
-    classes: reportRowsFromReport(null),
-  });
-  const quarter = reportQuarterForDate(date);
-  const quarterSummary = quarterSummaryForDate(date);
-  const recentReports = state.weeklyReports
-    .slice()
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 13);
-
-  return `
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Registo do Sábado</h2>
-            </div>
-        </div>
-        <form id="reportForm" class="form-grid">
-          <div class="form-grid two">
-            <div class="field">
-              <label for="reportDate">Data do sábado</label>
-              <input id="reportDate" type="date" value="${escapeHTML(date)}" data-action="weekly-report-date" />
-            </div>
-            <div class="field">
-              <label>Trimestre</label>
-              <input type="text" value="${escapeHTML(quarter)}" disabled />
-            </div>
-          </div>
-          <div class="muted-box">
-            <strong>Quadro competitivo</strong>
-            <div class="note" style="margin-top:6px">Preencha os dados por classe: matriculados, presentes, visitas, quem estudou a lição e oferta.</div>
-          </div>
-          <div class="list">
-            ${state.classes
-              .map((klass) => {
-                const row = reportRowsFromReport(report).find((item) => item.classId === klass.id) || makeEmptyReportClassRow(klass.id);
-                return `
-                  <div class="panel" style="padding:12px">
-                    <div class="toolbar wrap">
-                      <strong>${escapeHTML(klass.name)}</strong>
-                      <span class="chip gray">${escapeHTML(klass.leader)}</span>
-                    </div>
-                    <div class="form-grid three" style="margin-top:10px">
-                      <div class="field">
-                        <label for="enrolled_${klass.id}">Matriculados</label>
-                        <input id="enrolled_${klass.id}" name="enrolled_${klass.id}" type="number" min="0" value="${row.enrolled}" />
-                      </div>
-                      <div class="field">
-                        <label for="present_${klass.id}">Presentes</label>
-                        <input id="present_${klass.id}" name="present_${klass.id}" type="number" min="0" value="${row.present}" />
-                      </div>
-                      <div class="field">
-                        <label for="visits_${klass.id}">Visitas</label>
-                        <input id="visits_${klass.id}" name="visits_${klass.id}" type="number" min="0" value="${row.visits}" />
-                      </div>
-                      <div class="field">
-                        <label for="studied_${klass.id}">Estudaram lição</label>
-                        <input id="studied_${klass.id}" name="studied_${klass.id}" type="number" min="0" value="${row.studiedLesson}" />
-                      </div>
-                      <div class="field">
-                        <label for="offering_${klass.id}">Oferta</label>
-                        <input id="offering_${klass.id}" name="offering_${klass.id}" type="number" min="0" step="0.01" value="${row.offering}" />
-                      </div>
-                    </div>
-                  </div>
-                `;
-              })
-              .join("")}
-          </div>
-          <div class="form-grid two">
-            <div class="field">
-              <label for="reportNote">Observação geral</label>
-              <textarea id="reportNote" name="reportNote">${escapeHTML(existing?.note || "")}</textarea>
-            </div>
-            <div class="stack">
-              <div class="muted-box">
-                <strong>Quais dados entram no relatório</strong>
-                <div class="note" style="margin-top:6px">Quadro competitivo: cada classe por sábado. Quadro comparativo: total da escola sabatina naquele sábado.</div>
-              </div>
-              <div class="toolbar">
-                <button class="btn primary" type="submit">${icon("save")} Guardar relatório</button>
-                <button class="btn warn" type="button" data-action="print-report">${icon("print")} Imprimir PDF</button>
-              </div>
-            </div>
-          </div>
-        </form>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Quadro comparativo</h2>
-            </div>
-          <span class="chip alt">${weeklyReportLabel(date)}</span>
-        </div>
-        <div class="grid three">
-          ${reportMetric("Matriculados", report.totals.enrolled, "Total da escola")}
-          ${reportMetric("Presentes + visitas", report.totals.attendedWithVisits, "Participação do sábado")}
-          ${reportMetric("Estudaram lição", report.totals.studiedLesson, "Lição concluída")}
-        </div>
-        <div class="grid two" style="margin-top:14px">
-          ${reportMetric("Oferta total", report.totals.offering, "Valor do sábado")}
-          ${reportMetric("Ofertas acumuladas", report.totals.accumulatedOffering, "Acumulado do trimestre")}
-        </div>
-        <div class="list" style="margin-top:14px">
-          <div class="muted-box">
-            <strong>Resumo do quadro competitivo</strong>
-            <div class="note" style="margin-top:6px">Cada classe aparece com os seus números do sábado seleccionado.</div>
-          </div>
-          ${reportRowsFromReport(report)
-            .map((row) => {
-              const score = Number(row.present || 0) + Number(row.visits || 0) + Number(row.studiedLesson || 0);
-              return `
-                <div class="activity-item">
-                  <div>
-                    <strong>${escapeHTML(className(row.classId))}</strong>
-                    <div class="meta">Matriculados ${row.enrolled} · Presentes ${row.present} · Visitas ${row.visits} · Lição ${row.studiedLesson}</div>
-                  </div>
-                  <div class="stack" style="text-align:right">
-                    <span class="chip">${score} pontos</span>
-                    <span class="note">Oferta ${Number(row.offering || 0).toFixed(2)}</span>
-                  </div>
-                </div>
-              `;
-            })
-            .join("")}
-        </div>
-      </div>
-    </section>
-
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Relatório trimestral</h2>
-            </div>
-          <span class="chip alt">${quarterSummary.count}/13 sábados</span>
-        </div>
-        <div class="grid three">
-          ${reportMetric("Matriculados", quarterSummary.average.enrolled, "Média por sábado")}
-          ${reportMetric("Presentes", quarterSummary.average.present, "Média por sábado")}
-          ${reportMetric("Visitas", quarterSummary.average.visits, "Média por sábado")}
-          ${reportMetric("Presentes + visitas", quarterSummary.average.attendedWithVisits, "Média por sábado")}
-          ${reportMetric("Estudaram lição", quarterSummary.average.studiedLesson, "Média por sábado")}
-          ${reportMetric("Oferta média", quarterSummary.average.offering, "Média por sábado")}
-        </div>
-        <div class="muted-box" style="margin-top:14px">
-          <strong>Ofertas acumuladas no trimestre</strong>
-          <div style="font-size:1.4rem;font-weight:700;margin-top:8px">${escapeHTML(quarterSummary.accumulatedOffering)}</div>
-          <div class="note" style="margin-top:4px">Calculado a partir dos sábados já registados no trimestre.</div>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Sábados registados</h2>
-            </div>
-        </div>
-        <div class="list">
-          ${recentReports
-            .map(
-              (item) => `
-                <div class="muted-box">
-                  <div class="toolbar wrap">
-                    <strong>${weeklyReportLabel(item.date)}</strong>
-                    <div class="toolbar">
-                      <button type="button" class="btn" data-action="load-weekly-report" data-date="${item.date}">Abrir</button>
-                      <button type="button" class="btn danger" data-action="remove-weekly-report" data-id="${item.id}">Remover</button>
-                    </div>
-                  </div>
-                  <div class="note">${reportTotals(item).enrolled} matriculados · ${reportTotals(item).attendedWithVisits} presentes+visitas · oferta ${reportTotals(item).offering}</div>
-                </div>
-              `
-            )
-            .join("") || `<div class="muted-box">Ainda não existem relatórios guardados neste trimestre.</div>`}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function handleReportSubmit(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const date = form.querySelector("#reportDate").value;
-  const note = form.querySelector("#reportNote").value.trim();
-  const classes = state.classes.map((klass) => ({
-    classId: klass.id,
-    enrolled: Number(form.querySelector(`#enrolled_${klass.id}`).value || 0),
-    present: Number(form.querySelector(`#present_${klass.id}`).value || 0),
-    visits: Number(form.querySelector(`#visits_${klass.id}`).value || 0),
-    studiedLesson: Number(form.querySelector(`#studied_${klass.id}`).value || 0),
-    offering: Number(form.querySelector(`#offering_${klass.id}`).value || 0),
-  }));
-  const nextReport = buildWeeklyReportFromReport({
-    id: state.weeklyReports.find((item) => item.date === date)?.id || uid("wr"),
-    date,
-    note,
-    classes,
-  });
-  const index = state.weeklyReports.findIndex((item) => item.date === date);
-  if (index >= 0) {
-    state.weeklyReports[index] = nextReport;
-  } else {
-    state.weeklyReports.push(nextReport);
-  }
-  state.ui.reportDate = date;
-  persist();
-  render();
-}
-
-function buildReport() {
-  const date = state.ui.reportDate || todayISO();
-  const report = state.weeklyReports.find((item) => item.date === date) || buildWeeklyReportFromReport({ date, classes: reportRowsFromReport(null) });
-  return {
-    title: `Relatório de ${weeklyReportLabel(date)}`,
-    periodLabel: report.quarter,
-    classLabel: "Todas",
-    total: report.totals.attendedWithVisits,
-    caption: "Presentes + visitas",
-    note: "Quadro semanal e trimestral",
-    rows: [
-      {
-        label: "Matriculados",
-        value: report.totals.enrolled,
-        note: "Total da escola sabatina",
-      },
-      {
-        label: "Presentes + visitas",
-        value: report.totals.attendedWithVisits,
-        note: "Comparativo do sábado",
-      },
-      {
-        label: "Estudaram lição",
-        value: report.totals.studiedLesson,
-        note: "Lição concluída",
-      },
-      {
-        label: "Oferta total",
-        value: report.totals.offering,
-        note: "Oferta do sábado",
-      },
-      {
-        label: "Ofertas acumuladas",
-        value: report.totals.accumulatedOffering,
-        note: "Acumulado do trimestre",
-      },
-    ],
-  };
-}
-
-function printReport() {
-  const report = buildReport();
-  const html = `
-    <html>
-      <head>
-        <title>${escapeHTML(report.title)}</title>
-        <style>
-          body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#12201d}
-          h1,h2,p{margin:0 0 12px}
-          .box{border:1px solid #c8d6d2;border-radius:12px;padding:12px;margin:12px 0}
-          .muted{color:#58706b}
-          table{width:100%;border-collapse:collapse}
-          td{border-bottom:1px solid #dbe5e1;padding:8px 0;vertical-align:top}
-        </style>
-      </head>
-      <body>
-        <h1>${escapeHTML(report.title)}</h1>
-        <p class="muted">${escapeHTML(report.periodLabel)} · ${escapeHTML(report.classLabel)}</p>
-        <div class="box">
-          <strong>${escapeHTML(report.caption)}</strong>
-          <div>${escapeHTML(report.total)}</div>
-          <div class="muted">${escapeHTML(report.note)}</div>
-        </div>
-        <table>
-          ${report.rows
-            .map(
-              (row) => `
-              <tr><td><strong>${escapeHTML(row.label)}</strong><div class="muted">${escapeHTML(row.note || "")}</div></td><td>${escapeHTML(row.value)}</td></tr>
-            `
-            )
-            .join("")}
-        </table>
-        <script>window.onload=()=>{window.print();}</script>
-      </body>
-    </html>
-  `;
-  const win = window.open("", "_blank", "width=900,height=700");
-  if (!win) {
-    alert("O navegador bloqueou a janela de impressão.");
-    return;
-  }
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-}
-
-if (!globalThis.__iasdReportBind) {
-  document.addEventListener("change", (event) => {
-    const input = event.target.closest?.("[data-action='weekly-report-date']");
-    if (!input) return;
-    state.ui.reportDate = input.value;
-    persist();
-    render();
-  });
-
-  document.addEventListener("click", (event) => {
-    const load = event.target.closest?.("[data-action='load-weekly-report']");
-    if (load) {
-      state.ui.reportDate = load.dataset.date;
-      persist();
-      render();
-      return;
-    }
-    const remove = event.target.closest?.("[data-action='remove-weekly-report']");
-    if (remove) {
-      if (!window.confirm("Remover este relatório semanal?")) return;
-      state.weeklyReports = state.weeklyReports.filter((item) => item.id !== remove.dataset.id);
-      persist();
-      render();
-    }
-  });
-  globalThis.__iasdReportBind = true;
-}
 
 function navigateTo(view) {
   state.ui.view = view;
@@ -2598,214 +2751,31 @@ function metricCard(title, value, caption, view = null) {
   return `<button type="button" class="panel metric soft clickable" data-action="goto" data-view="${view}">${body}</button>`;
 }
 
-function statusBox(title, body) {
-  return `
-    <div class="muted-box">
-      <strong>${escapeHTML(title)}</strong>
-      <div class="note" style="margin-top:6px">${escapeHTML(body)}</div>
-    </div>
-  `;
-}
-
-function dashboardView() {
-  const summary = buildDashboard();
-  const secretary = isSecretary();
-  const shortcuts = secretary
-    ? [
-        ["members", "Membros"],
-        ["attendance", "Presencas"],
-        ["lessons", "Licoes"],
-        ["requests", "Trimestrais"],
-        ["program", "Programa"],
-        ["reports", "Relatorios"],
-        ["messages", "Mensagens"],
-        ["ranking", "Ranking"],
-      ]
-    : [
-        ["program", "Programa"],
-        ["ranking", "Ranking"],
-        ["messages", "Mensagens"],
-      ];
-
-  return `
-    <section class="panel dashboard-hero">
-      <div class="section-header">
-        <div>
-          <h2>${secretary ? "Painel da Direcao" : "Painel do Membro"}</h2>
-          </div>
-        <div class="toolbar">
-          <span class="chip alt">${secretary ? "Acesso administrativo" : "Acesso de membro"}</span>
-          <button type="button" class="btn" data-action="goto" data-view="program">${icon("program")} Programa</button>
-          <button type="button" class="btn" data-action="goto" data-view="messages">${icon("messages")} Mensagens</button>
-        </div>
-      </div>
-      <div class="hero-grid">
-        <div class="grid cards">
-          ${metricCard("Membros ativos", summary.members, "Cadastro principal e classes", "members")}
-          ${metricCard("Presenca media", `${summary.attendance}%`, "Ultimos registos da classe", "attendance")}
-          ${metricCard("Licoes registadas", summary.lessons, "Periodo corrente", "lessons")}
-          ${metricCard("Notificacoes", summary.messages, "Mensagens e avisos", "messages")}
-        </div>
-        <div class="muted-box">
-          <strong>Atalhos rapidos</strong>
-          <div class="note" style="margin-top:6px">Abra uma secao sem procurar no menu lateral.</div>
-          <div class="quick-links" style="margin-top:12px">
-            ${shortcuts
-              .map(
-                ([view, label]) => `
-                  <button type="button" class="btn" data-action="goto" data-view="${view}">
-                    ${escapeHTML(label)}
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-        </div>
-      </div>
-    </section>
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Proximo Sabado</h2>
-            </div>
-          <div class="toolbar">
-            <span class="chip alt">${formatDate(state.ui.programDate)}</span>
-            <button type="button" class="btn" data-action="goto" data-view="program">${icon("program")} Gerir</button>
-          </div>
-        </div>
-        <div class="list">
-          ${programsForDate(state.ui.programDate)
-            .map(
-              (item) => `
-              <div class="row" style="grid-template-columns: 82px minmax(0,1.8fr) 1fr 1fr;">
-                <strong>${escapeHTML(item.time)}</strong>
-                <div>
-                  <strong>${escapeHTML(item.activity)}</strong>
-                  <div class="note">${escapeHTML(item.note || "Sem observacoes")}</div>
-                </div>
-                <span>${escapeHTML(item.responsible)}</span>
-                <span class="chip gray">${escapeHTML(className(item.classId))}</span>
-              </div>
-            `
-            )
-            .join("") || `<div class="muted-box">Nenhum item publicado para esta data.</div>`}
-        </div>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Classe em Destaque</h2>
-            </div>
-          <button type="button" class="btn" data-action="goto" data-view="ranking">${icon("ranking")} Abrir ranking</button>
-        </div>
-        <div class="ranking">
-          ${rankingRows("quarter")
-            .slice(0, 4)
-            .map(
-              (item, index) => `
-                <div class="ranking-item">
-                  <strong>#${index + 1}</strong>
-                  <div>
-                    <strong>${escapeHTML(item.name)}</strong>
-                    <div class="note">Presenca ${item.score.attendance}% · Licao ${item.score.lesson}% · Participacao ${item.score.participation}%</div>
-                    <div class="progress"><span style="width:${item.weighted}%"></span></div>
-                  </div>
-                  <strong>${item.weighted}</strong>
-                </div>
-              `
-            )
-            .join("")}
-        </div>
-      </div>
-    </section>
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Resumo por classe</h2>
-            </div>
-          ${secretary ? `<button type="button" class="btn" data-action="goto" data-view="members">${icon("members")} Gerir membros</button>` : ""}
-        </div>
-        <div class="list">
-          ${state.classes
-            .map((klass) => {
-              const sum = getAttendanceSummary(klass.id);
-              return `
-                <div class="activity-item">
-                  <div>
-                    <strong>${escapeHTML(klass.name)}</strong>
-                    <div class="meta">${sum.members} membros activos · ${sum.sessions} presencas registadas · ${sum.visitors} visitantes</div>
-                  </div>
-                  <span class="chip">${sum.rate}%</span>
-                </div>
-              `;
-            })
-            .join("")}
-        </div>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Actividade recente</h2>
-            </div>
-          <button type="button" class="btn" data-action="goto" data-view="reports">${icon("reports")} Relatorios</button>
-        </div>
-        <div class="activity-list">
-          ${recentActivityItems()
-            .map(
-              (item) => `
-                <div class="activity-item">
-                  <div>
-                    <strong>${escapeHTML(item.title)}</strong>
-                    <div class="meta">${escapeHTML(item.meta)}</div>
-                  </div>
-                  <span class="chip gray">${escapeHTML(item.kind)}</span>
-                </div>
-              `
-            )
-            .join("")}
-        </div>
-      </div>
-    </section>
-    <section class="panel">
-      <div class="section-header">
-        <div>
-          <h2>Status rapido</h2>
-          </div>
-      </div>
-      <div class="grid three">
-        ${statusBox("Membros por classe", classBreakdown())}
-        ${statusBox("Requisicoes do trimestre", requestBreakdown())}
-        ${statusBox("Mensagens recentes", recentMessages())}
-      </div>
-    </section>
-  `;
-}
 
 function membersView() {
+  const secretary = isSecretary();
   const members = visibleMembers();
   const classFilter = state.ui.memberFilterClass;
   const filtered = classFilter === "all" ? members : members.filter((item) => item.classId === classFilter);
-  const editing = state.members.find((item) => item.id === state.ui.editMemberId) || null;
 
   return `
     <section class="grid two">
+      ${secretary ? `
       <div class="panel">
         <div class="section-header">
           <div>
-            <h2>${editing ? "Editar membro" : "Novo membro"}</h2>
+            <h2>${state.ui.editMemberId ? "Editar membro" : "Novo membro"}</h2>
             </div>
         </div>
         <form id="memberForm" class="form-grid">
           <div class="form-grid two">
             <div class="field">
               <label for="memberName">Nome</label>
-              <input id="memberName" name="name" value="${escapeHTML(editing?.name || "")}" required />
+              <input id="memberName" name="name" value="${escapeHTML((state.members.find((item) => item.id === state.ui.editMemberId)?.name) || "")}" required />
             </div>
             <div class="field">
               <label for="memberContact">Contacto</label>
-              <input id="memberContact" name="contact" value="${escapeHTML(editing?.contact || "")}" />
+              <input id="memberContact" name="contact" value="${escapeHTML((state.members.find((item) => item.id === state.ui.editMemberId)?.contact) || "")}" />
             </div>
           </div>
           <div class="form-grid three">
@@ -2815,33 +2785,34 @@ function membersView() {
                 ${state.classes
                   .map(
                     (klass) =>
-                      `<option value="${klass.id}" ${editing?.classId === klass.id ? "selected" : ""}>${escapeHTML(klass.name)}</option>`
+                      `<option value="${klass.id}" ${state.members.find((item) => item.id === state.ui.editMemberId)?.classId === klass.id ? "selected" : ""}>${escapeHTML(klass.name)}</option>`
                   )
                   .join("")}
               </select>
             </div>
             <div class="field">
               <label for="memberJoined">Data de ingresso</label>
-              <input id="memberJoined" name="joinedAt" type="date" value="${escapeHTML(editing?.joinedAt || todayISO())}" required />
+              <input id="memberJoined" name="joinedAt" type="date" value="${escapeHTML((state.members.find((item) => item.id === state.ui.editMemberId)?.joinedAt) || todayISO())}" required />
             </div>
             <div class="field">
               <label for="memberActive">Estado</label>
               <select id="memberActive" name="active">
-                <option value="true" ${editing?.active !== false ? "selected" : ""}>Activo</option>
-                <option value="false" ${editing?.active === false ? "selected" : ""}>Inactivo</option>
+                <option value="true" ${state.members.find((item) => item.id === state.ui.editMemberId)?.active !== false ? "selected" : ""}>Activo</option>
+                <option value="false" ${state.members.find((item) => item.id === state.ui.editMemberId)?.active === false ? "selected" : ""}>Inactivo</option>
               </select>
             </div>
           </div>
           <div class="toolbar">
-            <button class="btn primary" type="submit">${icon("save")} ${editing ? "Actualizar" : "Cadastrar"}</button>
-            ${editing ? `<button class="btn" type="button" data-action="cancel-member-edit">Cancelar</button>` : ""}
+            <button class="btn primary" type="submit">${icon("save")} ${state.ui.editMemberId ? "Actualizar" : "Cadastrar"}</button>
+            ${state.ui.editMemberId ? `<button class="btn" type="button" data-action="cancel-member-edit">Cancelar</button>` : ""}
           </div>
         </form>
       </div>
+      ` : ""}
       <div class="panel">
         <div class="section-header">
           <div>
-            <h2>Filtros e resumo</h2>
+            <h2>Membros matriculados</h2>
             </div>
         </div>
         <div class="form-grid">
@@ -2867,10 +2838,10 @@ function membersView() {
                 <span class="chip gray">${escapeHTML(className(member.classId))}</span>
                 <span>${formatDate(member.joinedAt)}</span>
                 <span class="status ${member.active ? "ok" : "bad"}">${member.active ? "Activo" : "Inactivo"}</span>
-                <div class="toolbar">
+                ${secretary ? `<div class="toolbar">
                   <button type="button" class="btn" data-action="edit-member" data-id="${member.id}">${icon("edit")} Editar</button>
                   <button type="button" class="btn danger" data-action="remove-member" data-id="${member.id}">Remover</button>
-                </div>
+                </div>` : ""}
               </div>
             `
             )
@@ -2964,79 +2935,6 @@ function lessonsView() {
             `
             )
             .join("") || `<div class="muted-box">Nenhuma lição encontrada com estes filtros.</div>`}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function requestsView() {
-  const quarter = state.ui.requestQuarter;
-  const filtered = state.quarterlyRequests.filter((item) => item.quarter === quarter);
-  return `
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Nova requisição</h2>
-            </div>
-        </div>
-        <form id="requestForm" class="form-grid">
-          <div class="form-grid three">
-            <div class="field">
-              <label for="requestQuarter">Trimestre</label>
-              <input id="requestQuarter" name="quarter" value="${escapeHTML(quarter)}" required />
-            </div>
-            <div class="field">
-              <label for="requestClassId">Classe</label>
-              <select id="requestClassId" name="classId" required>
-                ${state.classes.map((klass) => `<option value="${klass.id}">${escapeHTML(klass.name)}</option>`).join("")}
-              </select>
-            </div>
-            <div class="field">
-              <label for="requestQuantity">Quantidade</label>
-              <input id="requestQuantity" name="quantity" type="number" min="0" value="10" required />
-            </div>
-          </div>
-          <div class="field">
-            <label for="requestStatus">Estado</label>
-            <select id="requestStatus" name="status">
-              <option value="Pendente">Pendente</option>
-              <option value="Enviado">Enviado</option>
-            </select>
-          </div>
-          <button class="btn primary" type="submit">${icon("save")} Guardar requisição</button>
-        </form>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Histórico do trimestre</h2>
-            </div>
-        </div>
-        <div class="field">
-          <label for="requestQuarterFilter">Trimestre</label>
-          <input id="requestQuarterFilter" data-action="request-filter-quarter" value="${escapeHTML(quarter)}" />
-        </div>
-        <div class="list">
-          ${filtered
-            .slice()
-            .reverse()
-            .map(
-              (request) => `
-              <div class="muted-box">
-                <div class="toolbar wrap">
-                  <strong>${escapeHTML(className(request.classId))}</strong>
-                  <div class="toolbar">
-                    <span class="status ${request.status === "Enviado" ? "ok" : "warn"}">${escapeHTML(request.status)}</span>
-                    <button type="button" class="btn danger" data-action="remove-request" data-id="${request.id}">Remover</button>
-                  </div>
-                </div>
-                <div class="note">${request.quantity} trimestrais · ${formatDate(request.createdAt)}</div>
-              </div>
-            `
-            )
-            .join("") || `<div class="muted-box">Sem requisições para este trimestre.</div>`}
         </div>
       </div>
     </section>
@@ -3221,38 +3119,68 @@ function messageList(messages, secretary) {
 }
 
 function memberReportsView() {
-  const date = state.ui.reportDate || todayISO();
+  const date = getWeeklyReportDate();
   const existing = state.weeklyReports.find((item) => item.date === date) || null;
-  const report = existing || buildWeeklyReportFromReport({
-    date,
-    classes: reportRowsFromReport(null),
-  });
-  const quarterSummary = quarterSummaryForDate(date);
+  const report = buildWeeklyReportFromReport(existing || { date, classes: reportRowsFromReport(null) });
+  const quarter = reportQuarterForDate(date);
   const recentReports = state.weeklyReports
+    .filter((item) => reportQuarterForDate(item.date) === quarter)
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 13);
 
   return `
+    <section class="panel">
+      <div class="section-header">
+        <div>
+          <h2>Relatórios</h2>
+          </div>
+      </div>
+      <div class="form-grid three">
+        <div class="field">
+          <label for="reportQuarter">Trimestre</label>
+          <select id="reportQuarter" data-action="report-quarter">
+            ${[1, 2, 3, 4]
+              .map((value) => `<option value="${value}" ${state.ui.reportQuarter === value ? "selected" : ""}>${value}</option>`)
+              .join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="reportWeek">Sábado</label>
+          <select id="reportWeek" data-action="report-week">
+            ${Array.from({ length: 13 }, (_, index) => index + 1)
+              .map((value) => `<option value="${value}" ${state.ui.reportWeek === value ? "selected" : ""}>${value}</option>`)
+              .join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="reportDate">Data do sábado</label>
+          <input id="reportDate" type="date" value="${escapeHTML(date)}" data-action="weekly-report-date" />
+        </div>
+      </div>
+    </section>
+
     <section class="grid two">
       <div class="panel">
         <div class="section-header">
           <div>
-            <h2>Relatórios</h2>
+            <h2>Quadro comparativo</h2>
             </div>
-          <div class="toolbar">
-            <span class="chip alt">${weeklyReportLabel(date)}</span>
-            <button type="button" class="btn warn" data-action="print-report">${icon("print")} Imprimir PDF</button>
-          </div>
         </div>
-        <div class="grid three">
+        <div class="grid four" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;">
           ${reportMetric("Matriculados", report.totals.enrolled, "Total da escola")}
-          ${reportMetric("Presentes + visitas", report.totals.attendedWithVisits, "Participação do sábado")}
+          ${reportMetric("Presentes", report.totals.present, "Pessoas presentes")}
+          ${reportMetric("Visitas", report.totals.visits, "Visitantes do sábado")}
           ${reportMetric("Estudaram lição", report.totals.studiedLesson, "Lição concluída")}
         </div>
         <div class="grid two" style="margin-top:14px">
           ${reportMetric("Oferta total", report.totals.offering, "Valor do sábado")}
           ${reportMetric("Ofertas acumuladas", report.totals.accumulatedOffering, "Acumulado do trimestre")}
+        </div>
+            <div class="section-header">
+          <div>
+            <h2>Quadro competitivo</h2>
+            </div>
         </div>
         <div class="list" style="margin-top:14px">
           ${reportRowsFromReport(report)
@@ -3271,44 +3199,26 @@ function memberReportsView() {
             .join("")}
         </div>
       </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Resumo trimestral</h2>
-            </div>
-          <span class="chip alt">${quarterSummary.count}/13 sábados</span>
-        </div>
-        <div class="grid three">
-          ${reportMetric("Matriculados", quarterSummary.average.enrolled, "Média por sábado")}
-          ${reportMetric("Presentes", quarterSummary.average.present, "Média por sábado")}
-          ${reportMetric("Visitas", quarterSummary.average.visits, "Média por sábado")}
-          ${reportMetric("Lição", quarterSummary.average.studiedLesson, "Média por sábado")}
-          ${reportMetric("Oferta média", quarterSummary.average.offering, "Média por sábado")}
-          ${reportMetric("Presentes + visitas", quarterSummary.average.attendedWithVisits, "Média por sábado")}
-        </div>
-        <div class="muted-box" style="margin-top:14px">
-          <strong>Ofertas acumuladas no trimestre</strong>
-          <div style="font-size:1.4rem;font-weight:700;margin-top:8px">${escapeHTML(quarterSummary.accumulatedOffering)}</div>
-        </div>
-        <div class="list" style="margin-top:14px">
-          <div class="muted-box">
-            <strong>Últimos relatórios guardados</strong>
-            <div class="note" style="margin-top:6px">Leitura sem edição.</div>
+
+    <section class="panel">
+      <div class="section-header">
+        <div>
+          <h2>Sábados registados no trimestre</h2>
           </div>
-          ${recentReports
-            .map(
-              (item) => `
-                <div class="muted-box">
-                  <div class="toolbar wrap">
-                    <strong>${weeklyReportLabel(item.date)}</strong>
-                    <span class="chip gray">${reportTotals(item).attendedWithVisits} presentes+visitas</span>
-                  </div>
-                  <div class="note">Oferta ${reportTotals(item).offering} · Acumulado ${reportTotals(item).accumulatedOffering || 0}</div>
+      </div>
+      <div class="list">
+        ${recentReports
+          .map(
+            (item) => `
+              <div class="muted-box">
+                <div class="toolbar wrap">
+                  <strong>${weeklyReportLabel(item.date)}</strong>
+                  <span class="chip gray">${reportTotals(item).present} presentes · ${reportTotals(item).visits} visitas</span>
                 </div>
-              `
-            )
-            .join("") || `<div class="muted-box">Ainda não há relatórios guardados.</div>`}
-        </div>
+                <div class="note">Oferta ${reportTotals(item).offering} · Acumulado ${reportTotals(item).accumulatedOffering || 0}</div>
+              </div>
+            `)
+          .join("") || `<div class="muted-box">Ainda não há relatórios guardados neste trimestre.</div>`}
       </div>
     </section>
   `;
@@ -3404,8 +3314,7 @@ if (!globalThis.__iasdCleanupBound) {
   globalThis.__iasdCleanupBound = true;
 }
 
+
+
 render();
-
-
-
 
