@@ -86,10 +86,11 @@ const seed = () => ({
     { id: "classe-05-adultos", name: "Classe 05-Adultos", leader: "Irm. Responsável" },
     { id: "pos-batismal", name: "Pos-Batismal", leader: "Irm. Responsável" },
     { id: "batismal", name: "Batismal", leader: "Irm. Responsável" },
-    { id: "adolescentes", name: "Adolescentes", leader: "Irm. Nelson" },
+    { id: "juvenis", name: "Juvenis", leader: "Irm. Responsavel" },
     { id: "primarios", name: "Primarios", leader: "Irm. Responsável" },
     { id: "jardim-de-infancia", name: "Jardim de infancia", leader: "Irm. Responsável" },
     { id: "rol-de-berco", name: "Rol de Berco", leader: "Irm. Responsável" },
+    { id: "adolescentes", name: "Adolescentes", leader: "Irm. Responsável" },
   ],
   members: [
     {
@@ -118,7 +119,7 @@ const seed = () => ({
     },
     {
       id: "m4",
-      name: "Lurdes Nhampossa",
+      name: "Dalma Nhampossa",
       classId: "adolescentes",
       contact: "+258 82 000 0004",
       joinedAt: "2025-07-06",
@@ -126,7 +127,7 @@ const seed = () => ({
     },
     {
       id: "m5",
-      name: "António Mucavele",
+      name: "Hebenezer Paculeque",
       classId: "pos-batismal",
       contact: "+258 82 000 0005",
       joinedAt: "2025-08-10",
@@ -568,7 +569,7 @@ function shellView() {
     <div class="shell ${state.ui.sidebarOpen ? "sidebar-open" : ""}">
       <aside class="sidebar">
         <div class="brand">
-          <img class="brand-logo" src="${LOGO_SECONDARY}" alt="Cora��o e Alma da Igreja" />
+          <img class="brand-logo" src="${LOGO_SECONDARY}" alt="Coração e Alma da Igreja" />
           <strong>Sistema de Gestão da Escola Sabatina</strong>
           <span>${user?.name || ""} · ${user?.role === "secretary" ? "Secretário/Diretor" : "Membro"}</span>
         </div>
@@ -614,12 +615,12 @@ function pageTitle(view) {
   return {
     dashboard: "Visão Geral",
     members: "Membros",
+    reports: "Relatórios e Estatísticas",
+    program: "Programa do Próximo Sábado",
+    ranking: "Classe em Destaque",
     attendance: "Presenças",
     lessons: "Lições e Estudos",
     requests: "Requisições de Trimensários",
-    program: "Programa do Próximo Sábado",
-    ranking: "Classe em Destaque",
-    reports: "Relatórios e Estatísticas",
     messages: "Comunicação e Notificações",
   }[view] || "Sistema";
 }
@@ -674,6 +675,13 @@ function dashboardView() {
   const week = state.ui.reportWeek;
   const updateLabel = weeklyReportLabel(getWeeklyReportDate());
   const requestSummary = requestBreakdown();
+  const quarterKey = getQuarterKey(state.ui.reportYear, state.ui.reportQuarter);
+  const quarterReports = reportsForQuarter(state.ui.reportYear, state.ui.reportQuarter);
+  const latestQuarterReport = quarterReports.slice().reverse().find((report) => reportTotals(report).enrolled > 0);
+  const latestQuarterTotals = latestQuarterReport ? reportTotals(latestQuarterReport) : { enrolled: 0 };
+  const totalVisits = summary.quarterData.reduce((sum, item) => sum + item.visits, 0);
+  const totalBaptized = summary.quarterData.reduce((sum, item) => sum + item.baptized, 0);
+  const requestedLessons = requestedLessonsForQuarter(state.ui.reportYear, state.ui.reportQuarter);
   const offerings = summary.averageOffering;
   const prevQuarter = state.ui.reportQuarter === 1 ? 4 : state.ui.reportQuarter - 1;
   const prevYear = state.ui.reportQuarter === 1 ? state.ui.reportYear - 1 : state.ui.reportYear;
@@ -852,7 +860,7 @@ function dashboardView() {
             <div class="card-head">
               <div>
                 <p class="card-title">Ofertas</p>
-                <p class="card-sub">Média por sábado no trimestre atual</p>
+                <p class="card-sub">Média por sábado no trimestre</p>
               </div>
               <div class="kpi">
                 <span class="num">${offerings.toFixed(0)} MZN</span>
@@ -1573,6 +1581,7 @@ function rankingView() {
 }
 
 function reportsView() {
+  const secretary = isSecretary();
   const reportType = "attendance";
   const reportPeriod = "quarter";
   const reportClassId = "all";
@@ -1584,7 +1593,9 @@ function reportsView() {
   const weekDate = getReportDateForQuarterWeek(year, quarter, week);
   const weeklyExisting = state.weeklyReports.find((item) => item.date === weekDate) || null;
   const weeklyReport = buildWeeklyReportFromReport(weeklyExisting || { date: weekDate, classes: reportRowsFromReport(null) });
+  const editableRows = reportRowsFromReport(weeklyReport);
   const quarterSummary = quarterSummaryForDate(weekDate);
+  const automaticQuarterSummary = buildAutomaticReportSummary(reportsForQuarter(year, quarter), requestedLessonsForQuarter(year, quarter));
   // build competitive rows depending on selected period
   let competitiveRows = [];
   if (period === "week") {
@@ -1659,7 +1670,7 @@ function reportsView() {
           <div class="form-grid three">
             <div class="field">
               <label for="reportYear">Ano</label>
-              <select id="reportYear" name="reportYear">
+              <select id="reportYear" name="reportYear" data-action="report-year">
                 ${getDashboardYearOptions()
                   .map((item) => `<option value="${item.value}" ${state.ui.reportYear === item.value ? "selected" : ""}>${item.label}</option>`)
                   .join("")}
@@ -1667,7 +1678,7 @@ function reportsView() {
             </div>
             <div class="field">
               <label for="reportQuarter">Trimestre</label>
-              <select id="reportQuarter" name="reportQuarter">
+              <select id="reportQuarter" name="reportQuarter" data-action="report-quarter">
                 ${[1, 2, 3, 4]
                   .map((value) => `<option value="${value}" ${state.ui.reportQuarter === value ? "selected" : ""}>${value}</option>`)
                   .join("")}
@@ -1675,7 +1686,7 @@ function reportsView() {
             </div>
             <div class="field">
               <label for="reportWeek">Sábado</label>
-              <select id="reportWeek" name="reportWeek">
+              <select id="reportWeek" name="reportWeek" data-action="report-week">
                 ${Array.from({ length: 13 }, (_, index) => index + 1)
                   .map((value) => `<option value="${value}" ${state.ui.reportWeek === value ? "selected" : ""}>${value}</option>`)
                   .join("")}
@@ -1690,7 +1701,61 @@ function reportsView() {
       </div>
     </section>
 
-    <section class="grid two">
+    ${secretary ? `
+      <section class="panel">
+        <div class="section-header">
+          <div>
+            <h2>Cadastrar relatorio semanal</h2>
+            <p>Registo do sabado ${escapeHTML(formatDate(weekDate))}</p>
+          </div>
+          <span class="chip alt">${weeklyExisting ? "Relatorio existente" : "Novo relatorio"}</span>
+        </div>
+        <form id="weeklyReportForm" class="form-grid">
+          <div class="field">
+            <label for="weeklyReportDate">Data do sabado</label>
+            <input id="weeklyReportDate" name="date" type="date" value="${escapeHTML(weekDate)}" data-action="weekly-report-date" required />
+          </div>
+          <div class="list">
+            ${editableRows
+              .map((row) => `
+                <div class="muted-box">
+                  <strong>${escapeHTML(className(row.classId))}</strong>
+                  <div class="form-grid three" style="margin-top:10px">
+                    <div class="field">
+                      <label for="report_${row.classId}_enrolled">Matriculados</label>
+                      <input id="report_${row.classId}_enrolled" name="${row.classId}_enrolled" type="number" min="0" value="${Number(row.enrolled || 0)}" />
+                    </div>
+                    <div class="field">
+                      <label for="report_${row.classId}_present">Presentes</label>
+                      <input id="report_${row.classId}_present" name="${row.classId}_present" type="number" min="0" value="${Number(row.present || 0)}" />
+                    </div>
+                    <div class="field">
+                      <label for="report_${row.classId}_visits">Visitas</label>
+                      <input id="report_${row.classId}_visits" name="${row.classId}_visits" type="number" min="0" value="${Number(row.visits || 0)}" />
+                    </div>
+                    <div class="field">
+                      <label for="report_${row.classId}_studiedLesson">Estudaram licao</label>
+                      <input id="report_${row.classId}_studiedLesson" name="${row.classId}_studiedLesson" type="number" min="0" value="${Number(row.studiedLesson || 0)}" />
+                    </div>
+                    <div class="field">
+                      <label for="report_${row.classId}_offering">Oferta</label>
+                      <input id="report_${row.classId}_offering" name="${row.classId}_offering" type="number" min="0" step="0.01" value="${Number(row.offering || 0)}" />
+                    </div>
+                    <div class="field">
+                      <label for="report_${row.classId}_baptized">Almas batizadas</label>
+                      <input id="report_${row.classId}_baptized" name="${row.classId}_baptized" type="number" min="0" value="${Number(row.baptized || 0)}" />
+                    </div>
+                  </div>
+                </div>
+              `)
+              .join("")}
+          </div>
+          <button class="btn primary" type="submit">${icon("save")} Guardar relatorio</button>
+        </form>
+      </section>
+    ` : ""}
+
+    <section class="grid two" style="grid-template-columns:1fr">
       <div class="panel">
         <div class="section-header">
           <div>
@@ -1755,6 +1820,11 @@ function reportsView() {
         </div>
       </div>
     </section>
+
+    <section class="grid two">
+      ${renderQuarterlyAutomaticReport(year, quarter, automaticQuarterSummary)}
+      ${renderAnnualAutomaticReport(year)}
+    </section>
   `;
 }
 
@@ -1764,6 +1834,174 @@ function reportMetric(title, value, caption) {
       <div class="chip">${escapeHTML(title)}</div>
       <div style="font-size:1.4rem;font-weight:700;margin-top:8px">${escapeHTML(value)}</div>
       <div class="note" style="margin-top:4px">${escapeHTML(caption)}</div>
+    </div>
+  `;
+}
+
+function reportsForQuarter(year, quarter) {
+  return state.weeklyReports
+    .filter((item) => reportQuarterForDate(item.date) === getQuarterKey(year, quarter))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function reportsForYear(year) {
+  return state.weeklyReports
+    .filter((item) => new Date(`${item.date}T00:00:00`).getFullYear() === year)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function requestedLessonsForQuarter(year, quarter) {
+  const quarterKey = getQuarterKey(year, quarter);
+  return state.quarterlyRequests
+    .filter((request) => request.quarter === quarterKey)
+    .reduce((sum, request) => sum + Number(request.quantity || 0), 0);
+}
+
+function buildAutomaticReportSummary(reports, requestedLessons = 0) {
+  const count = reports.length;
+  const latestReport = reports
+    .slice()
+    .reverse()
+    .find((report) => reportTotals(report).enrolled > 0);
+  const totals = reports.reduce(
+    (acc, report) => {
+      const reportTotal = reportTotals(report);
+      acc.enrolled += Number(reportTotal.enrolled || 0);
+      acc.present += Number(reportTotal.present || 0);
+      acc.visits += Number(reportTotal.visits || 0);
+      acc.studiedLesson += Number(reportTotal.studiedLesson || 0);
+      acc.offering += Number(reportTotal.offering || 0);
+      acc.baptized += Number(reportTotal.baptized || 0);
+      return acc;
+    },
+    { enrolled: 0, present: 0, visits: 0, studiedLesson: 0, offering: 0, baptized: 0 }
+  );
+
+  const classRows = state.classes.map((klass) => {
+    const rowTotals = reports.reduce(
+      (acc, report) => {
+        const row = (report.classes || []).find((item) => item.classId === klass.id) || makeEmptyReportClassRow(klass.id);
+        acc.enrolled += Number(row.enrolled || 0);
+        acc.present += Number(row.present || 0);
+        acc.visits += Number(row.visits || 0);
+        acc.studiedLesson += Number(row.studiedLesson || 0);
+        acc.offering += Number(row.offering || 0);
+        acc.baptized += Number(row.baptized || 0);
+        return acc;
+      },
+      { classId: klass.id, enrolled: 0, present: 0, visits: 0, studiedLesson: 0, offering: 0, baptized: 0 }
+    );
+    return {
+      ...rowTotals,
+      averageEnrolled: count ? Math.round(rowTotals.enrolled / count) : 0,
+      averagePresent: count ? Math.round(rowTotals.present / count) : 0,
+    };
+  });
+
+  return {
+    count,
+    totals,
+    totalEnrolled: latestReport ? reportTotals(latestReport).enrolled : 0,
+    requestedLessons,
+    averageEnrolled: count ? Math.round(totals.enrolled / count) : 0,
+    averagePresent: count ? Math.round(totals.present / count) : 0,
+    averageAttendance: totals.enrolled ? Math.round((totals.present / totals.enrolled) * 100) : 0,
+    averageStudiedLesson: count ? Math.round(totals.studiedLesson / count) : 0,
+    classRows,
+  };
+}
+
+function trendLabel(value, previousValue) {
+  if (previousValue === null || previousValue === undefined) return "Base";
+  if (value > previousValue) return `Subiu +${value - previousValue}`;
+  if (value < previousValue) return `Caiu -${previousValue - value}`;
+  return "Manteve";
+}
+
+function renderQuarterlyAutomaticReport(year, quarter, summary) {
+  return `
+    <div class="panel">
+      <div class="section-header">
+        <div>
+          <h2>Relatorio trimestral</h2>
+          <p>Calculado pelos relatorios semanais e requisicoes guardadas</p>
+        </div>
+        <span class="chip alt">T${quarter} ${year}</span>
+      </div>
+      <div class="grid three" style="margin-bottom:14px">
+        ${reportMetric("Total matriculados", summary.totalEnrolled, "Ultimo sabado registado")}
+        ${reportMetric("Media de presenca", `${summary.averageAttendance}%`, "Presentes sobre matriculados")}
+        ${reportMetric("Licoes requisitadas", summary.requestedLessons, "Total do trimestre")}
+      </div>
+      <div class="grid three" style="margin-bottom:14px">
+        ${reportMetric("Media estudo da licao", summary.averageStudiedLesson, "Por sabado")}
+        ${reportMetric("Visitas", summary.totals.visits, "Total do periodo")}
+        ${reportMetric("Almas batizadas", summary.totals.baptized, "Total do periodo")}
+      </div>
+      <div class="grid two" style="margin-bottom:14px">
+        ${reportMetric("Oferta total", Number(summary.totals.offering || 0).toFixed(2), "Soma do periodo")}
+        ${reportMetric("Sabados registados", summary.count, "Relatorios semanais")}
+      </div>
+      <div class="list" style="display:none">
+        ${summary.count
+          ? summary.classRows
+              .map((row) => `
+                <div class="activity-item">
+                  <div>
+                    <strong>${escapeHTML(className(row.classId))}</strong>
+                    <div class="meta">Media: ${row.averageEnrolled} matriculados - ${row.averagePresent} presentes</div>
+                    <div class="note">Total: ${row.present} presentes - ${row.visits} visitas - ${row.studiedLesson} licoes - ${row.baptized} batismos</div>
+                  </div>
+                  <div class="stack" style="text-align:right">
+                    <span class="chip">${Number(row.offering || 0).toFixed(2)}</span>
+                    <span class="note">Oferta</span>
+                  </div>
+                </div>
+              `)
+              .join("")
+          : `<div class="muted-box">Ainda nao ha relatorios semanais para este periodo.</div>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderAnnualAutomaticReport(year) {
+  const rows = [1, 2, 3, 4].map((quarter) => ({
+    quarter,
+    summary: buildAutomaticReportSummary(reportsForQuarter(year, quarter), requestedLessonsForQuarter(year, quarter)),
+  }));
+
+  return `
+    <div class="panel">
+      <div class="section-header">
+        <div>
+          <h2>Relatorio anual</h2>
+          <p>Resumo por trimestre com subidas e quedas</p>
+        </div>
+        <span class="chip alt">${year}</span>
+      </div>
+      <div class="list">
+        ${rows
+          .map((item, index) => {
+            const previous = rows[index - 1]?.summary || null;
+            const attendanceTrend = trendLabel(item.summary.averageAttendance, previous?.averageAttendance);
+            const offeringTrend = trendLabel(Math.round(item.summary.totals.offering || 0), previous ? Math.round(previous.totals.offering || 0) : null);
+            return `
+              <div class="activity-item">
+                <div>
+                  <strong>T${item.quarter}</strong>
+                  <div class="meta">Matriculados ${item.summary.totalEnrolled} - Presenca media ${item.summary.averageAttendance}% - Licoes req. ${item.summary.requestedLessons}</div>
+                  <div class="note">Estudo medio ${item.summary.averageStudiedLesson} - Visitas ${item.summary.totals.visits} - Batismos ${item.summary.totals.baptized} - Oferta ${Number(item.summary.totals.offering || 0).toFixed(2)}</div>
+                </div>
+                <div class="stack" style="text-align:right">
+                  <span class="chip">${escapeHTML(attendanceTrend)}</span>
+                  <span class="note">Oferta: ${escapeHTML(offeringTrend)}</span>
+                </div>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
     </div>
   `;
 }
@@ -2112,6 +2350,9 @@ function wireEvents() {
   const reportFilterForm = document.getElementById("reportFilterForm");
   if (reportFilterForm) reportFilterForm.addEventListener("submit", handleReportFilterSubmit);
 
+  const weeklyReportForm = document.getElementById("weeklyReportForm");
+  if (weeklyReportForm) weeklyReportForm.addEventListener("submit", handleWeeklyReportSubmit);
+
   document.querySelectorAll("[data-action='print-report']").forEach((button) => {
     button.addEventListener("click", printReport);
   });
@@ -2141,6 +2382,21 @@ function wireEvents() {
     reportWeekSelect.addEventListener("change", (event) => {
       state.ui.reportWeek = Number(event.target.value);
       state.ui.reportDate = getWeeklyReportDateForQuarterWeek(state.ui.reportYear, state.ui.reportQuarter, state.ui.reportWeek);
+      persist();
+      render();
+    });
+  }
+
+  const weeklyReportDateInput = document.querySelector("[data-action='weekly-report-date']");
+  if (weeklyReportDateInput) {
+    weeklyReportDateInput.addEventListener("change", (event) => {
+      const date = event.target.value;
+      if (!date) return;
+      const [yearString, quarterString] = reportQuarterForDate(date).split("-T");
+      state.ui.reportYear = Number(yearString);
+      state.ui.reportQuarter = Number(quarterString);
+      state.ui.reportWeek = reportWeekForDate(date);
+      state.ui.reportDate = date;
       persist();
       render();
     });
@@ -2200,11 +2456,17 @@ function handleMemberSubmit(event) {
     state.members.push({ id: newMemberId, ...payload });
     
     // Criar automaticamente um usuário para o novo membro
-    const firstName = payload.name.split(" ")[0].toLowerCase();
+    const baseUsername = payload.name.split(" ")[0].toLowerCase();
+    let username = baseUsername;
+    let suffix = 2;
+    while (state.users.some((user) => user.username === username)) {
+      username = `${baseUsername}${suffix}`;
+      suffix += 1;
+    }
     const newUserId = uid("u");
     state.users.push({
       id: newUserId,
-      username: firstName,
+      username,
       password: "Membro26",
       role: "member",
       name: payload.name,
@@ -2321,6 +2583,45 @@ function handleReportFilterSubmit(event) {
   state.ui.reportYear = Number(form.querySelector("#reportYear").value);
   state.ui.reportQuarter = Number(form.querySelector("#reportQuarter").value);
   state.ui.reportWeek = Number(form.querySelector("#reportWeek").value);
+  state.ui.reportDate = getReportDateForQuarterWeek(state.ui.reportYear, state.ui.reportQuarter, state.ui.reportWeek);
+  persist();
+  render();
+}
+
+function handleWeeklyReportSubmit(event) {
+  event.preventDefault();
+  if (!isSecretary()) {
+    alert("Apenas Secretario/Diretor pode cadastrar relatorios.");
+    return;
+  }
+
+  const form = event.currentTarget;
+  const date = form.querySelector("#weeklyReportDate").value;
+  const classes = state.classes.map((klass) => ({
+    classId: klass.id,
+    enrolled: Number(form.elements[`${klass.id}_enrolled`]?.value || 0),
+    present: Number(form.elements[`${klass.id}_present`]?.value || 0),
+    visits: Number(form.elements[`${klass.id}_visits`]?.value || 0),
+    studiedLesson: Number(form.elements[`${klass.id}_studiedLesson`]?.value || 0),
+    offering: Number(form.elements[`${klass.id}_offering`]?.value || 0),
+    baptized: Number(form.elements[`${klass.id}_baptized`]?.value || 0),
+  }));
+  const report = {
+    id: state.weeklyReports.find((item) => item.date === date)?.id || uid("wr"),
+    date,
+    classes,
+  };
+  const existingIndex = state.weeklyReports.findIndex((item) => item.date === date);
+  if (existingIndex >= 0) {
+    state.weeklyReports[existingIndex] = report;
+  } else {
+    state.weeklyReports.push(report);
+  }
+  const [yearString, quarterString] = reportQuarterForDate(date).split("-T");
+  state.ui.reportYear = Number(yearString);
+  state.ui.reportQuarter = Number(quarterString);
+  state.ui.reportWeek = reportWeekForDate(date);
+  state.ui.reportDate = date;
   persist();
   render();
 }
@@ -2574,6 +2875,7 @@ function makeEmptyReportClassRow(classId) {
     visits: 0,
     studiedLesson: 0,
     offering: 0,
+    baptized: 0,
   };
 }
 
@@ -2591,6 +2893,7 @@ function reportTotals(report) {
   const visits = rows.reduce((sum, row) => sum + Number(row.visits || 0), 0);
   const studiedLesson = rows.reduce((sum, row) => sum + Number(row.studiedLesson || 0), 0);
   const offering = rows.reduce((sum, row) => sum + Number(row.offering || 0), 0);
+  const baptized = rows.reduce((sum, row) => sum + Number(row.baptized || 0), 0);
   return {
     enrolled,
     present,
@@ -2598,6 +2901,7 @@ function reportTotals(report) {
     attendedWithVisits: present + visits,
     studiedLesson,
     offering,
+    baptized,
   };
 }
 
@@ -2701,6 +3005,16 @@ function removeRecord(kind, id) {
   const key = map[kind];
   if (!key || !Array.isArray(state[key])) return;
   state[key] = state[key].filter((item) => item.id !== id);
+
+  if (kind === "member") {
+    // Remove a conta de utilizador ligada a este membro e limpar as
+    // presenças registadas em seu nome, para não deixar dados órfãos.
+    state.users = state.users.filter((user) => user.memberId !== id);
+    state.attendance.forEach((session) => {
+      session.entries = (session.entries || []).filter((entry) => entry.memberId !== id);
+    });
+  }
+
   persist();
   render();
 }

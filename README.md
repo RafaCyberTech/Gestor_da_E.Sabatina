@@ -16,8 +16,8 @@ py -m http.server 4173 --bind 127.0.0.1
 
 ## Contas de demonstração
 
-- `secretario` / `1234`
-- `maria` / `1234`
+- `secretario` / `Direcao26`
+- `maria` / `Membro26`
 
 ## O que está incluído
 
