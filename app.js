@@ -573,7 +573,7 @@ function dashboardView() {
       .dashboard-wrap header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #1B2A45;}
       .dashboard-wrap .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#C79A3E;font-weight:600;margin-bottom:6px;}
       .dashboard-wrap h1{font-family:'Fraunces',serif;font-weight:600;font-size:32px;margin:0;line-height:1.1;}
-      .dashboard-wrap .top-meta{text-align:right;font-size:13px;color:#3C4E6E;line-height:1.5;}
+      .dashboard-wrap .top-meta{text-align:right;font-size:13px;color:#3C4E6E;line-height:1.5;margin-left:auto;}
       .dashboard-wrap .top-meta strong{color:#1B2A45;}
       .dashboard-wrap .filters{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:20px;}
       .dashboard-wrap .filters .field{min-width:160px;}

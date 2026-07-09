@@ -78,25 +78,6 @@ a { color: inherit; }
   overflow: hidden;
 }
 
-/* Padrão geométrico africano no topo da sidebar */
-.sidebar::before {
-  content: '';
-  display: block;
-  height: 6px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--gold)      0px,
-    var(--gold)      8px,
-    transparent      8px,
-    transparent      12px,
-    #3a8f5e          12px,
-    #3a8f5e          20px,
-    transparent      20px,
-    transparent      24px
-  );
-  flex: 0 0 auto;
-}
-
 .sidebar::after {
   content: '';
   display: block;
@@ -840,7 +821,6 @@ a { color: inherit; }
     transform: translateX(0);
   }
 
-  .sidebar::before,
   .sidebar::after { display: none; }
 
   .sidebar-inner { gap: 14px; padding: 14px 14px 18px; }
