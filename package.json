@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "Sistema de Gestão da Escola Sabatina - IASD Canaã, Pemba",
   "private": true,
-  "main": "server.js",
+  "main": "servidor.js",
   "scripts": {
     "start": "node server.js"
   },
