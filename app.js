@@ -1,5 +1,5 @@
-const LOGO_MAIN = "./logo/logo-main.png";
-const LOGO_SECONDARY = "./logo/logo-secondary.png";
+const LOGO_MAIN = "./logo/logo-main.svg";
+const LOGO_SECONDARY = "./logo/logo-secondary.svg";
 
 // Helper functions - must be defined before seed()
 function localISODate(date) {
@@ -47,6 +47,8 @@ const icon = (name) => {
     save: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>`,
     print: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6"/><path d="M6 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1"/><path d="M6 14h12v7H6z"/></svg>`,
     edit: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`,
+    account: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>`,
+    lock: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>`,
   };
   return map[name] || "";
 };
@@ -526,12 +528,6 @@ function getWeeklyReportDateForQuarterWeek(year, quarter, week) {
   return getReportDateForQuarterWeek(year, quarter, week);
 }
 
-function getWeeklyReportDate() {
-  const selectedDate = state.ui.reportDate;
-  if (selectedDate) return selectedDate;
-  return getWeeklyReportDateForQuarterWeek(state.ui.reportYear, state.ui.reportQuarter, state.ui.reportWeek);
-}
-
 function loginView() {
   return `
     <div class="login-wrap">
@@ -577,6 +573,7 @@ function shellView() {
     ["ranking", "Classe em Destaque", "ranking"],
     ["reports", "Relatórios", "reports"],
     ["messages", "Comunicação", "messages"],
+    ["account", "Minha Conta", "account"],
   ];
 
   const summary = dashboardSummary();
@@ -637,6 +634,7 @@ function pageTitle(view) {
     lessons: "Lições e Estudos",
     requests: "Requisições de Trimensários",
     messages: "Comunicação e Notificações",
+    account: "Minha Conta",
   }[view] || "Sistema";
 }
 
@@ -671,6 +669,8 @@ function renderView() {
       return reportsView();
     case "messages":
       return messagesView();
+    case "account":
+      return accountView();
     default:
       return dashboardView();
   }
@@ -818,6 +818,11 @@ function dashboardView() {
               </div>
             </div>
             <div class="chart-box short"><canvas id="chartFrequencia"></canvas></div>
+            <div class="legend-row">
+              <span><i class="dot" style="background:#5C7F5E"></i> ≥75%</span>
+              <span><i class="dot" style="background:#C79A3E"></i> 50–74%</span>
+              <span><i class="dot" style="background:#A15A3E"></i> &lt;50%</span>
+            </div>
           </div>
 
           <div class="card">
@@ -909,11 +914,36 @@ function initializeDashboardCharts() {
   destroyChart('chartLicao');
   destroyChart('chartOfertas');
 
+  Chart.defaults.font.family = "'Source Sans 3', sans-serif";
+  Chart.defaults.color = '#3C4E6E';
+
+  const tooltipStyle = {
+    backgroundColor: '#1B2A45',
+    titleColor: '#F8F5EE',
+    titleFont: { family: "'Fraunces', serif", size: 13, weight: '600' },
+    bodyColor: '#F8F5EE',
+    bodyFont: { size: 12 },
+    padding: 10,
+    cornerRadius: 8,
+    displayColors: false,
+    caretSize: 6,
+    borderColor: '#C79A3E',
+    borderWidth: 1,
+  };
+
   const noBorderGrid = (axis) => ({
     grid: { color: '#E4DCC9', display: axis === 'y' },
     ticks: { font: { size: 11 } },
     border: { display: false },
   });
+
+  const makeGradient = (canvas, colorTop, colorBottom, height = 190) => {
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, colorTop);
+    gradient.addColorStop(1, colorBottom);
+    return gradient;
+  };
 
   const summary = buildDashboard();
   const labels = summary.quarterData.map((item) => `S${item.week}`);
@@ -938,35 +968,48 @@ function initializeDashboardCharts() {
             label: 'Presentes',
             data: presentData,
             borderColor: '#5C7F5E',
-            backgroundColor: 'rgba(92,127,94,0.16)',
+            backgroundColor: makeGradient(ctxMembros, 'rgba(92,127,94,0.32)', 'rgba(92,127,94,0.02)'),
+            borderWidth: 2.5,
             fill: true,
-            tension: 0.35,
+            tension: 0.4,
             pointRadius: 3,
-            pointBackgroundColor: '#5C7F5E',
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: '#5C7F5E',
+            pointBorderWidth: 2,
+            pointHoverBackgroundColor: '#5C7F5E',
           },
           {
             label: 'Matriculados',
             data: enrolledData,
             borderColor: '#A15A3E',
             backgroundColor: 'transparent',
-            borderDash: [4, 3],
-            tension: 0.35,
-            pointRadius: 3,
-            pointBackgroundColor: '#A15A3E',
+            borderWidth: 2,
+            borderDash: [5, 4],
+            tension: 0.4,
+            pointRadius: 2.5,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: '#A15A3E',
+            pointBorderWidth: 2,
+            pointHoverBackgroundColor: '#A15A3E',
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: noBorderGrid('x'), y: noBorderGrid('y') },
+        interaction: { mode: 'index', intersect: false },
+        animation: { duration: 700, easing: 'easeOutQuart' },
+        plugins: { legend: { display: false }, tooltip: tooltipStyle },
+        scales: { x: noBorderGrid('x'), y: { ...noBorderGrid('y'), beginAtZero: true } },
       },
     });
   }
 
   const ctxFrequencia = document.getElementById('chartFrequencia');
   if (ctxFrequencia) {
+    const barColors = attendanceData.map((value) => (value >= 75 ? '#5C7F5E' : value >= 50 ? '#C79A3E' : '#A15A3E'));
     new Chart(ctxFrequencia, {
       type: 'bar',
       data: {
@@ -974,8 +1017,10 @@ function initializeDashboardCharts() {
         datasets: [
           {
             data: attendanceData,
-            backgroundColor: '#C79A3E',
-            borderRadius: 4,
+            backgroundColor: barColors,
+            hoverBackgroundColor: barColors,
+            borderRadius: 6,
+            borderSkipped: false,
             maxBarThickness: 22,
           },
         ],
@@ -983,7 +1028,11 @@ function initializeDashboardCharts() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        animation: { duration: 700, easing: 'easeOutQuart' },
+        plugins: {
+          legend: { display: false },
+          tooltip: { ...tooltipStyle, callbacks: { label: (ctx) => `Frequência: ${ctx.parsed.y}%` } },
+        },
         scales: {
           x: noBorderGrid('x'),
           y: { ...noBorderGrid('y'), min: 0, max: 100, ticks: { callback: (v) => `${v}%`, font: { size: 11 } } },
@@ -1003,8 +1052,10 @@ function initializeDashboardCharts() {
           {
             label: 'Lições estudadas',
             data: lessonData,
-            backgroundColor: '#5C7F5E',
-            borderRadius: 4,
+            backgroundColor: makeGradient(ctxLicao, '#7A9C7C', '#5C7F5E', 150),
+            hoverBackgroundColor: '#4A6B4C',
+            borderRadius: 6,
+            borderSkipped: false,
             maxBarThickness: 18,
           },
         ],
@@ -1012,7 +1063,8 @@ function initializeDashboardCharts() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        animation: { duration: 700, easing: 'easeOutQuart' },
+        plugins: { legend: { display: false }, tooltip: tooltipStyle },
         scales: {
           x: noBorderGrid('x'),
           y: { ...noBorderGrid('y'), min: 0, ticks: { font: { size: 11 } } },
@@ -1031,15 +1083,19 @@ function initializeDashboardCharts() {
           {
             label: `${state.ui.reportQuarter}T ${state.ui.reportYear}`,
             data: offeringData,
-            backgroundColor: '#C79A3E',
-            borderRadius: 4,
+            backgroundColor: makeGradient(ctxOfertas, '#D9AE55', '#C79A3E'),
+            hoverBackgroundColor: '#B4872F',
+            borderRadius: 6,
+            borderSkipped: false,
             maxBarThickness: 16,
           },
           {
             label: `${prevQuarter}T ${prevYear}`,
             data: prevOfferingData,
-            backgroundColor: '#E7CE95',
-            borderRadius: 4,
+            backgroundColor: '#EFDDB0',
+            hoverBackgroundColor: '#E7CE95',
+            borderRadius: 6,
+            borderSkipped: false,
             maxBarThickness: 16,
           },
         ],
@@ -1047,7 +1103,11 @@ function initializeDashboardCharts() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        animation: { duration: 700, easing: 'easeOutQuart' },
+        plugins: {
+          legend: { display: false },
+          tooltip: { ...tooltipStyle, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y} MZN` } },
+        },
         scales: { x: noBorderGrid('x'), y: noBorderGrid('y') },
       },
     });
@@ -1080,16 +1140,6 @@ function buildDashboard() {
     averageOffering,
     quarterData,
   };
-}
-
-function metricCard(title, value, caption) {
-  return `
-    <article class="panel metric soft">
-      <span class="chip">${escapeHTML(title)}</span>
-      <strong>${escapeHTML(value)}</strong>
-      <span>${escapeHTML(caption)}</span>
-    </article>
-  `;
 }
 
 function statusBox(title, body) {
@@ -1285,94 +1335,6 @@ function statusLabel(status) {
   return { presente: "Presente", ausente: "Ausente", visitante: "Visitante" }[status] || status;
 }
 
-function lessonsView() {
-  const classId = state.ui.lessonClassId;
-  const quarter = state.ui.lessonQuarter;
-  const filtered = state.lessons.filter((item) => (classId === "all" || item.classId === classId) && item.quarter === quarter);
-  return `
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Novo registo</h2>
-            </div>
-        </div>
-        <form id="lessonForm" class="form-grid">
-          <div class="form-grid three">
-            <div class="field">
-              <label for="lessonDate">Data</label>
-              <input id="lessonDate" type="date" value="${escapeHTML(todayISO())}" required />
-            </div>
-            <div class="field">
-              <label for="lessonQuarter">Trimestre</label>
-              <input id="lessonQuarterInput" name="quarter" value="${escapeHTML(quarter)}" required />
-            </div>
-            <div class="field">
-              <label for="lessonClassId">Classe</label>
-              <select id="lessonClassId" name="classId" required>
-                ${state.classes
-                  .map((klass) => `<option value="${klass.id}">${escapeHTML(klass.name)}</option>`)
-                  .join("")}
-              </select>
-            </div>
-          </div>
-          <div class="field">
-            <label for="lessonTopic">Tema da lição</label>
-            <input id="lessonTopic" name="topic" placeholder="Tema do sábado" required />
-          </div>
-          <div class="field">
-            <label for="lessonLeader">Quem ministrou / liderou</label>
-            <input id="lessonLeader" name="leader" placeholder="Nome do líder" required />
-          </div>
-          <button class="btn primary" type="submit">${icon("save")} Guardar lição</button>
-        </form>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Consulta</h2>
-            </div>
-        </div>
-        <div class="form-grid two">
-          <div class="field">
-            <label for="lessonClassFilter">Classe</label>
-            <select id="lessonClassFilter" data-action="lesson-filter-class">
-              <option value="all">Todas</option>
-              ${state.classes
-                .map(
-                  (klass) =>
-                    `<option value="${klass.id}" ${classId === klass.id ? "selected" : ""}>${escapeHTML(klass.name)}</option>`
-                )
-                .join("")}
-            </select>
-          </div>
-          <div class="field">
-            <label for="lessonQuarterFilter">Trimestre</label>
-            <input id="lessonQuarterFilter" data-action="lesson-filter-quarter" value="${escapeHTML(quarter)}" />
-          </div>
-        </div>
-        <div class="list">
-          ${filtered
-            .slice()
-            .reverse()
-            .map(
-              (lesson) => `
-              <div class="muted-box">
-                <div class="toolbar wrap">
-                  <strong>${escapeHTML(lesson.topic)}</strong>
-                  <span class="chip gray">${escapeHTML(className(lesson.classId))}</span>
-                </div>
-                <div class="note">${formatDate(lesson.date)} · ${escapeHTML(lesson.leader)}</div>
-              </div>
-            `
-            )
-            .join("") || `<div class="muted-box">Nenhuma lição encontrada com estes filtros.</div>`}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
 function requestsView() {
   const quarter = state.ui.requestQuarter;
   const filtered = state.quarterlyRequests.filter((item) => item.quarter === quarter);
@@ -1437,91 +1399,6 @@ function requestsView() {
             `
             )
             .join("") || `<div class="muted-box">Sem requisições para este trimestre.</div>`}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function programView() {
-  const items = programsForDate(state.ui.programDate);
-  if (!isSecretary()) {
-    return readOnlyProgramView(items);
-  }
-  return `
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Publicar programa</h2>
-            </div>
-        </div>
-        <form id="programForm" class="form-grid">
-          <div class="form-grid two">
-            <div class="field">
-              <label for="programDate">Data</label>
-              <input id="programDate" name="date" type="date" value="${escapeHTML(state.ui.programDate)}" required />
-            </div>
-            <div class="field">
-              <label for="programClassId">Classe responsável</label>
-              <select id="programClassId" name="classId" required>
-                ${state.classes
-                  .map((klass) => `<option value="${klass.id}">${escapeHTML(klass.name)}</option>`)
-                  .join("")}
-              </select>
-            </div>
-          </div>
-          <div class="form-grid three">
-            <div class="field">
-              <label for="programTime">Hora</label>
-              <input id="programTime" name="time" value="08:00" required />
-            </div>
-            <div class="field">
-              <label for="programOrder">Ordem</label>
-              <input id="programOrder" name="order" type="number" min="1" value="${items.length + 1}" required />
-            </div>
-            <div class="field">
-              <label for="programResponsible">Responsável</label>
-              <input id="programResponsible" name="responsible" required />
-            </div>
-          </div>
-          <div class="field">
-            <label for="programActivity">Actividade</label>
-            <input id="programActivity" name="activity" required />
-          </div>
-          <div class="field">
-            <label for="programNote">Observação</label>
-            <textarea id="programNote" name="note"></textarea>
-          </div>
-          <button class="btn primary" type="submit">${icon("save")} Publicar item</button>
-        </form>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Programa agendado</h2>
-            </div>
-        </div>
-        <div class="field">
-          <label for="programDateFilter">Data</label>
-          <input id="programDateFilter" type="date" data-action="program-date" value="${escapeHTML(state.ui.programDate)}" />
-        </div>
-        <div class="list">
-          ${items
-            .map(
-              (item) => `
-              <div class="row" style="grid-template-columns: 72px minmax(0,1.55fr) 1fr 1fr;">
-                <strong>${escapeHTML(item.time)}</strong>
-                <div>
-                  <strong>${escapeHTML(item.activity)}</strong>
-                  <div class="note">${escapeHTML(item.note || "Sem observações")}</div>
-                </div>
-                <span>${escapeHTML(item.responsible)}</span>
-                <span class="chip gray">${escapeHTML(className(item.classId))}</span>
-              </div>
-            `
-            )
-            .join("") || `<div class="muted-box">Nenhum item registado para essa data.</div>`}
         </div>
       </div>
     </section>
@@ -2118,94 +1995,6 @@ function buildReport(type, period, classId) {
   };
 }
 
-function messagesView() {
-  const secretary = isSecretary();
-  const messages = visibleMessages();
-  const inbox = messages.filter((msg) => msg.fromRole !== "secretary" || !secretary);
-  const outbox = messages.filter((msg) => msg.fromRole === "secretary");
-  return `
-    <section class="grid two">
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>${secretary ? "Enviar comunicado" : "Enviar mensagem"}</h2>
-            </div>
-        </div>
-        <form id="messageForm" class="form-grid">
-          <div class="form-grid three">
-            <div class="field">
-              <label for="messageTarget">Destino</label>
-              <select id="messageTarget" name="target">
-                ${secretary ? `
-                  <option value="all">Todos os membros</option>
-                  ${state.classes.map((klass) => `<option value="${klass.id}">${escapeHTML(klass.name)}</option>`).join("")}
-                ` : `<option value="secretary">Secretário / Director</option>`}
-              </select>
-            </div>
-            <div class="field">
-              <label for="messageSubject">Assunto</label>
-              <input id="messageSubject" name="subject" required />
-            </div>
-            <div class="field">
-              <label for="messageClassId">Classe</label>
-              <select id="messageClassId" name="classId">
-                <option value="">Sem classe</option>
-                ${state.classes.map((klass) => `<option value="${klass.id}">${escapeHTML(klass.name)}</option>`).join("")}
-              </select>
-            </div>
-          </div>
-          <div class="field">
-            <label for="messageBody">Mensagem</label>
-            <textarea id="messageBody" name="body" required></textarea>
-          </div>
-          <button class="btn primary" type="submit">${icon("messages")} Enviar</button>
-        </form>
-      </div>
-      <div class="panel">
-        <div class="section-header">
-          <div>
-            <h2>Caixa de mensagens</h2>
-            </div>
-        </div>
-        <div class="toolbar">
-          <button class="btn ${state.ui.messageMode === "inbox" ? "primary" : ""}" type="button" data-action="message-mode" data-mode="inbox">Entrada</button>
-          <button class="btn ${state.ui.messageMode === "outbox" ? "primary" : ""}" type="button" data-action="message-mode" data-mode="outbox">Saída</button>
-          <button class="btn ${state.ui.messageMode === "all" ? "primary" : ""}" type="button" data-action="message-mode" data-mode="all">Todos</button>
-        </div>
-        <div class="list">
-          ${messageList(messages, secretary)}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function messageList(messages, secretary) {
-  let rows = messages;
-  if (state.ui.messageMode === "inbox") {
-    rows = messages.filter((msg) => msg.fromRole !== "secretary" || !secretary);
-  }
-  if (state.ui.messageMode === "outbox") {
-    rows = messages.filter((msg) => msg.fromRole === "secretary");
-  }
-  return rows
-    .slice()
-    .reverse()
-    .map(
-      (message) => `
-      <div class="muted-box">
-        <div class="toolbar wrap">
-          <strong>${escapeHTML(message.subject)}</strong>
-          <span class="chip ${message.fromRole === "secretary" ? "alt" : ""}">${escapeHTML(message.from)}</span>
-        </div>
-        <div class="note">${formatDate(message.createdAt)} · ${escapeHTML(targetLabel(message.target, message.classId))}</div>
-        <div style="margin-top:8px">${escapeHTML(message.body)}</div>
-      </div>
-    `
-    )
-    .join("") || `<div class="muted-box">Sem mensagens para esta vista.</div>`;
-}
-
 function targetLabel(target, classId) {
   if (target === "all") return "Todos os membros";
   if (target === "secretary") return "Secretário / Director";
@@ -2242,6 +2031,14 @@ function wireEvents() {
       state.ui.sidebarOpen = false;
       persist();
       render();
+      if (button.dataset.nav === "account" && isSecretary()) {
+        apiFetch("/api/accounts")
+          .then((data) => {
+            state.accounts = data.accounts;
+            render();
+          })
+          .catch((err) => console.error("Falha ao carregar contas:", err));
+      }
     });
   });
 
@@ -2289,6 +2086,13 @@ function wireEvents() {
 
   const memberForm = document.getElementById("memberForm");
   if (memberForm) memberForm.addEventListener("submit", handleMemberSubmit);
+
+  const passwordForm = document.getElementById("passwordForm");
+  if (passwordForm) passwordForm.addEventListener("submit", handlePasswordChangeSubmit);
+
+  document.querySelectorAll("[data-action='reset-password']").forEach((button) => {
+    button.addEventListener("click", () => resetAccountPassword(button.dataset.id, button.dataset.name));
+  });
 
   document.querySelectorAll("[data-action='edit-member']").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2476,6 +2280,47 @@ async function handleLogin(event) {
     alert("Não foi possível ligar ao servidor. Verifique a sua ligação à internet.");
   } finally {
     if (submitButton) submitButton.disabled = false;
+  }
+}
+
+async function handlePasswordChangeSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const currentPassword = form.currentPassword.value;
+  const newPassword = form.newPassword.value;
+  const confirmPassword = form.confirmPassword.value;
+  if (newPassword !== confirmPassword) {
+    alert("A nova senha e a confirmação não coincidem.");
+    return;
+  }
+  if (newPassword.length < 6) {
+    alert("A nova senha deve ter pelo menos 6 caracteres.");
+    return;
+  }
+  try {
+    await apiFetch("/api/auth/password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) });
+    alert("Senha alterada com sucesso.");
+    form.reset();
+  } catch (err) {
+    alert(err.message || "Não foi possível mudar a senha.");
+  }
+}
+
+async function resetAccountPassword(accountId, name) {
+  const newPassword = window.prompt(`Nova senha para ${name || "esta conta"} (mínimo 6 caracteres):`);
+  if (!newPassword) return;
+  if (newPassword.length < 6) {
+    alert("A nova senha deve ter pelo menos 6 caracteres.");
+    return;
+  }
+  try {
+    await apiFetch(`/api/accounts/${encodeURIComponent(accountId)}/password`, {
+      method: "POST",
+      body: JSON.stringify({ newPassword }),
+    });
+    alert("Senha reposta com sucesso.");
+  } catch (err) {
+    alert(err.message || "Não foi possível repor a senha.");
   }
 }
 
@@ -2832,57 +2677,6 @@ function printReport() {
   win.document.close();
 }
 
-function navigateTo(view) {
-  state.ui.view = view;
-  persist();
-  render();
-}
-
-function recentActivityItems() {
-  const items = [
-    ...state.attendance.map((session) => ({
-      kind: "Presenca",
-      date: session.date,
-      title: `${className(session.classId)} - ${formatDate(session.date)}`,
-      meta: `${session.entries.filter((entry) => entry.status === "presente").length} presentes · ${session.visitorCount || 0} visitantes`,
-    })),
-    ...state.lessons.map((lesson) => ({
-      kind: "Licao",
-      date: lesson.date,
-      title: lesson.topic,
-      meta: `${className(lesson.classId)} · ${lesson.leader}`,
-    })),
-    ...state.quarterlyRequests.map((request) => ({
-      kind: "Trimestral",
-      date: request.createdAt,
-      title: `${className(request.classId)} - ${request.quantity} unidades`,
-      meta: `${request.quarter} · ${request.status}`,
-    })),
-    ...state.messages.map((message) => ({
-      kind: "Mensagem",
-      date: message.createdAt,
-      title: message.subject,
-      meta: `${message.from} · ${targetLabel(message.target, message.classId)}`,
-    })),
-  ];
-  return items
-    .slice()
-    .sort((a, b) => `${b.date}`.localeCompare(`${a.date}`))
-    .slice(0, 6);
-}
-
-function metricCard(title, value, caption, view = null) {
-  const body = `
-    <span class="chip">${escapeHTML(title)}</span>
-    <strong>${escapeHTML(value)}</strong>
-    <span>${escapeHTML(caption)}</span>
-  `;
-  if (!view) {
-    return `<article class="panel metric soft">${body}</article>`;
-  }
-  return `<button type="button" class="panel metric soft clickable" data-action="goto" data-view="${view}">${body}</button>`;
-}
-
 if (!globalThis.__iasdGotoBound) {
   document.addEventListener("click", (event) => {
     const button = event.target.closest?.("[data-action='goto']");
@@ -2891,8 +2685,6 @@ if (!globalThis.__iasdGotoBound) {
   });
   globalThis.__iasdGotoBound = true;
 }
-
-render();
 
 function reportQuarterForDate(dateString) {
   const date = new Date(`${dateString}T00:00:00`);
@@ -3396,6 +3188,70 @@ function programView() {
             .join("") || `<div class="muted-box">Nenhum item registado para essa data.</div>`}
         </div>
       </div>
+    </section>
+  `;
+}
+
+function accountView() {
+  const user = currentUser();
+  const secretary = isSecretary();
+  const accounts = state.accounts || [];
+  return `
+    <section class="grid two">
+      <div class="panel">
+        <div class="section-header">
+          <div>
+            <h2>Mudar a minha senha</h2>
+            <p class="muted">A sessão em ${escapeHTML(user?.username || "")} (${secretary ? "direcção" : "membro"})</p>
+          </div>
+        </div>
+        <form id="passwordForm" class="form-grid">
+          <div class="field">
+            <label for="currentPassword">Senha actual</label>
+            <input id="currentPassword" name="currentPassword" type="password" required autocomplete="current-password" />
+          </div>
+          <div class="field">
+            <label for="newPassword">Nova senha</label>
+            <input id="newPassword" name="newPassword" type="password" required minlength="6" autocomplete="new-password" />
+          </div>
+          <div class="field">
+            <label for="confirmPassword">Confirmar nova senha</label>
+            <input id="confirmPassword" name="confirmPassword" type="password" required minlength="6" autocomplete="new-password" />
+          </div>
+          <button class="btn primary" type="submit">${icon("lock")} Mudar senha</button>
+        </form>
+      </div>
+      ${
+        secretary
+          ? `
+      <div class="panel">
+        <div class="section-header">
+          <div>
+            <h2>Contas de acesso</h2>
+            <p class="muted">Repor a senha de qualquer conta, se alguém esquecer a sua.</p>
+          </div>
+        </div>
+        <div class="list">
+          ${
+            accounts.length
+              ? accounts
+                  .map(
+                    (account) => `
+              <div class="row" style="grid-template-columns: 1fr 1fr 120px;">
+                <strong>${escapeHTML(account.name)}</strong>
+                <span class="chip gray">${escapeHTML(account.username)} · ${account.role === "secretary" ? "Direcção" : "Membro"}</span>
+                <button type="button" class="btn ghost" data-action="reset-password" data-id="${account.id}" data-name="${escapeHTML(account.name)}">Repor senha</button>
+              </div>
+            `
+                  )
+                  .join("")
+              : `<div class="muted-box">A carregar contas...</div>`
+          }
+        </div>
+      </div>
+      `
+          : ""
+      }
     </section>
   `;
 }

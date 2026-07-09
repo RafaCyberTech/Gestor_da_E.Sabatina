@@ -7,7 +7,8 @@ informação, esteja onde estiver).
 ## Requisitos
 
 - **Node.js 22.5 ou mais recente** (usa o módulo nativo `node:sqlite`,
-  ainda experimental). Verifique com `node --version`.
+  ainda experimental). O servidor verifica isto automaticamente ao
+  arrancar e avisa com uma mensagem clara se a versão for antiga.
 - Não é preciso `npm install` — o servidor não usa nenhuma dependência
   externa, só módulos nativos do Node (`http`, `crypto`, `node:sqlite`).
 
@@ -27,11 +28,40 @@ automaticamente na primeira execução, com os dados de demonstração).
 - `secretario` / `Direcao26` — acesso total (direcção)
 - `joaquim`, `maria`, `anselmo`, `lurdes`, `antonio` / `Membro26` — acesso de membro
 
-**Mude estas senhas antes de disponibilizar a aplicação a sério.** Não
-há, para já, um ecrã para o próprio utilizador mudar a senha; para
-alterar uma senha, apague o ficheiro `data/escola-sabatina.db` (o que
-apaga TODOS os dados) ou peça ajuda para adicionar um ecrã de gestão de
-senhas.
+**Mude estas senhas antes de disponibilizar a aplicação a sério.** Cada
+utilizador pode mudar a sua própria senha em **Minha Conta**, dentro da
+aplicação (menu lateral). A direcção também pode repor a senha de
+qualquer conta a partir dessa mesma página, caso alguém esqueça a sua.
+
+## Segurança
+
+- Senhas encriptadas (`scrypt`) no servidor — nunca em texto simples.
+- **Protecção contra tentativas repetidas de login**: depois de 5
+  tentativas falhadas para o mesmo utilizador, essa conta fica
+  bloqueada durante 15 minutos.
+- Sessões por token, válidas 30 dias, guardadas apenas no dispositivo
+  onde se iniciou sessão.
+- Só contas de **direcção** podem alterar membros, presenças, lições,
+  requisições, relatórios semanais, programas e configurações. Contas
+  de **membro** têm acesso de leitura a estes dados e podem enviar ou
+  apagar as suas próprias mensagens — o servidor impõe isto, não é só a
+  interface que esconde botões.
+
+## Cópias de segurança automáticas
+
+O servidor faz uma cópia de segurança da base de dados automaticamente
+a cada 6 horas (mais uma cópia logo ao arrancar), guardadas em
+`data/backups/`. Mantém as últimas 28 cópias (cerca de uma semana) e
+apaga as mais antigas automaticamente. Pode ajustar isto com variáveis
+de ambiente:
+
+```bash
+BACKUP_INTERVAL_HOURS=6 BACKUP_KEEP=28 node server.js
+```
+
+Isto complementa, mas não substitui, uma cópia de segurança externa
+regular (por exemplo, descarregar o ficheiro `data/escola-sabatina.db`
+de vez em quando para um local separado).
 
 ## Hospedar para acesso pela internet
 
@@ -44,21 +74,22 @@ Pontos importantes:
    serviços de hospedagem (Render, Railway, Fly.io) já dá HTTPS
    automaticamente. Numa VPS própria, use algo como Caddy ou Nginx com
    Let's Encrypt à frente do `node server.js`.
-2. **Guarde a pasta `data/`** — é onde fica a base de dados SQLite com
-   todos os membros, presenças, mensagens, etc. Faça cópias de
-   segurança regulares desse ficheiro. Em muitos serviços de
-   hospedagem, o disco não é permanente por padrão — confirme que o seu
-   plano tem "disco persistente" ou "volume", senão os dados desaparecem
-   a cada reinício.
+2. **Guarde a pasta `data/`** — é onde ficam a base de dados e as
+   cópias de segurança automáticas. Confirme que o seu plano de
+   hospedagem tem "disco persistente" ou "volume" — em muitos planos
+   gratuitos o disco não é permanente e os dados desapareceriam a cada
+   reinício.
 3. **Variável `PORT`** — a maioria dos serviços de hospedagem define
    automaticamente a variável de ambiente `PORT`; o servidor já a lê.
 4. **Mude as senhas de demonstração** antes de anunciar o acesso a
-   sério (ver secção acima).
+   sério (ver secção "Contas de demonstração" acima).
 
 ## O que está incluído
 
 - Login por perfil (direcção / membro), com sessão partilhada entre
-  dispositivos
+  dispositivos, protegida contra tentativas de força bruta
+- Mudança de senha pelo próprio utilizador, e reposição de senha pela
+  direcção
 - Gestão de membros (com criação automática de conta de acesso)
 - Presenças por sábado
 - Lições e estudos por trimestre
@@ -66,20 +97,11 @@ Pontos importantes:
 - Programa do próximo sábado
 - Classe em destaque com ranking
 - Relatórios filtráveis e impressão para PDF
+- Visão Geral com gráficos (crescimento de membros, frequência,
+  estudo da lição, ofertas) com cores que destacam o desempenho de
+  cada sábado
 - Comunicação entre membros e direcção
-
-## Arquitectura e permissões
-
-- Os dados partilhados (classes, membros, presenças, lições,
-  requisições, relatórios semanais, programas, configurações) só podem
-  ser alterados por uma conta de **direcção**. Contas de **membro** têm
-  acesso de leitura a estes dados e podem enviar/remover as suas
-  próprias mensagens.
-- As senhas ficam encriptadas (`scrypt`) na base de dados do servidor —
-  nunca em texto simples, nem no código, nem no navegador.
-- Cada sessão de login gera um código de acesso próprio (token), válido
-  por 30 dias, que fica guardado apenas no dispositivo onde iniciou
-  sessão.
+- Cópias de segurança automáticas da base de dados
 
 ## Limitação conhecida
 
@@ -91,3 +113,12 @@ a gerir os dados de cada vez — isto não costuma ser problema. Se
 precisar de edição simultânea por várias pessoas da direcção ao mesmo
 tempo, isso exigiria mais trabalho de desenvolvimento (bloqueio por
 campo/registo em vez de por documento inteiro).
+
+## Logótipos
+
+Os ficheiros `logo/logo-main.svg` e `logo/logo-secondary.svg` são
+ilustrações genéricas criadas para o projecto não ficar com imagens
+partidas — não são o logótipo oficial da IASD. Substitua-os pelos
+logótipos reais da igreja quando os tiver disponíveis (podem ser `.svg`
+ou `.png` — só é preciso ajustar as extensões em `LOGO_MAIN` e
+`LOGO_SECONDARY` no topo do `app.js` se usar `.png`).

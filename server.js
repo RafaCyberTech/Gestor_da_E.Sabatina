@@ -6,6 +6,16 @@
 // Não usa nenhuma dependência externa (sem npm install necessário):
 // usa apenas módulos nativos do Node.js 22+ (http, crypto, node:sqlite).
 
+const [MAJOR, MINOR] = process.versions.node.split(".").map(Number);
+if (MAJOR < 22 || (MAJOR === 22 && MINOR < 5)) {
+  console.error(
+    `\nEste servidor precisa do Node.js 22.5 ou mais recente (usa o módulo nativo node:sqlite).\n` +
+      `Versão instalada: ${process.versions.node}.\n` +
+      `Actualize o Node.js e tente novamente.\n`
+  );
+  process.exit(1);
+}
+
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -16,7 +26,10 @@ const root = __dirname;
 const port = process.env.PORT || 4173;
 const host = process.env.HOST || "0.0.0.0";
 const DB_PATH = process.env.DB_PATH || path.join(root, "data", "escola-sabatina.db");
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(root, "data", "backups");
 const SESSION_DAYS = 30;
+const BACKUP_INTERVAL_HOURS = Number(process.env.BACKUP_INTERVAL_HOURS || 6);
+const BACKUP_KEEP = Number(process.env.BACKUP_KEEP || 28); // ~1 semana ao ritmo de 6/6h
 
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 const db = new DatabaseSync(DB_PATH);
@@ -44,6 +57,12 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS app_data (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     json TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS login_attempts (
+    username TEXT PRIMARY KEY,
+    failed_count INTEGER NOT NULL DEFAULT 0,
+    locked_until INTEGER
   );
 `);
 
@@ -135,6 +154,54 @@ function verifyPassword(password, salt, expectedHash) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+// ---------------------------------------------------------------------------
+// Protecção contra tentativas de login por força bruta
+// ---------------------------------------------------------------------------
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutos
+
+function getLoginAttempt(username) {
+  return db.prepare("SELECT * FROM login_attempts WHERE username = ?").get(username);
+}
+function isLockedOut(username) {
+  const row = getLoginAttempt(username);
+  return !!(row && row.locked_until && row.locked_until > Date.now());
+}
+function registerFailedLogin(username) {
+  const row = getLoginAttempt(username);
+  const count = (row?.failed_count || 0) + 1;
+  const lockedUntil = count >= MAX_FAILED_ATTEMPTS ? Date.now() + LOCKOUT_MS : null;
+  db.prepare(
+    `INSERT INTO login_attempts (username, failed_count, locked_until) VALUES (?, ?, ?)
+     ON CONFLICT(username) DO UPDATE SET failed_count = excluded.failed_count, locked_until = excluded.locked_until`
+  ).run(username, count, lockedUntil);
+}
+function clearLoginAttempts(username) {
+  db.prepare("DELETE FROM login_attempts WHERE username = ?").run(username);
+}
+
+// ---------------------------------------------------------------------------
+// Cópias de segurança automáticas da base de dados
+// ---------------------------------------------------------------------------
+function runBackup() {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const dest = path.join(BACKUP_DIR, `escola-sabatina-${stamp}.db`);
+    db.exec(`VACUUM INTO '${dest.replace(/'/g, "''")}'`);
+    const files = fs
+      .readdirSync(BACKUP_DIR)
+      .filter((f) => f.endsWith(".db"))
+      .sort();
+    while (files.length > BACKUP_KEEP) {
+      fs.unlinkSync(path.join(BACKUP_DIR, files.shift()));
+    }
+    console.log(`Cópia de segurança criada: ${dest}`);
+  } catch (err) {
+    console.error("Falha ao criar cópia de segurança:", err.message);
+  }
+}
+
 function seedIfEmpty() {
   const row = db.prepare("SELECT COUNT(*) as count FROM app_data").get();
   if (row.count === 0) {
@@ -162,6 +229,8 @@ function seedIfEmpty() {
   }
 }
 seedIfEmpty();
+runBackup();
+setInterval(runBackup, BACKUP_INTERVAL_HOURS * 60 * 60 * 1000);
 
 function getAppData() {
   const row = db.prepare("SELECT json FROM app_data WHERE id = 1").get();
@@ -285,10 +354,17 @@ async function handleApi(req, res, urlPath) {
     const body = await readJSONBody(req);
     const username = String(body.username || "").trim();
     const password = String(body.password || "");
+
+    if (isLockedOut(username)) {
+      return sendJSON(res, 429, { error: "Demasiadas tentativas falhadas. Tente novamente dentro de 15 minutos." });
+    }
+
     const row = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
     if (!row || !verifyPassword(password, row.salt, row.password_hash)) {
+      registerFailedLogin(username);
       return sendJSON(res, 401, { error: "Utilizador ou senha inválidos." });
     }
+    clearLoginAttempts(username);
     const token = createSession(row.id);
     return sendJSON(res, 200, { token, user: sanitizeUser(row) });
   }
@@ -307,6 +383,41 @@ async function handleApi(req, res, urlPath) {
 
   if (req.method === "GET" && urlPath === "/api/auth/me") {
     return sendJSON(res, 200, { user: sanitizeUser(user) });
+  }
+
+  // Mudar a própria senha (exige a senha actual)
+  if (req.method === "POST" && urlPath === "/api/auth/password") {
+    const body = await readJSONBody(req);
+    const currentPassword = String(body.currentPassword || "");
+    const newPassword = String(body.newPassword || "");
+    if (newPassword.length < 6) return sendJSON(res, 400, { error: "A nova senha deve ter pelo menos 6 caracteres." });
+    if (!verifyPassword(currentPassword, user.salt, user.password_hash)) {
+      return sendJSON(res, 401, { error: "A senha actual está incorrecta." });
+    }
+    const { hash, salt } = hashPassword(newPassword);
+    db.prepare("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?").run(hash, salt, user.id);
+    return sendJSON(res, 200, { ok: true });
+  }
+
+  // Repor a senha de outra conta — só a direcção, sem precisar da senha antiga
+  if (req.method === "POST" && parts[1] === "accounts" && parts[2] && parts[3] === "password") {
+    if (user.role !== "secretary") return sendJSON(res, 403, { error: "Só a direcção pode repor senhas." });
+    const targetId = parts[2];
+    const body = await readJSONBody(req);
+    const newPassword = String(body.newPassword || "");
+    if (newPassword.length < 6) return sendJSON(res, 400, { error: "A nova senha deve ter pelo menos 6 caracteres." });
+    const target = db.prepare("SELECT id FROM users WHERE id = ?").get(targetId);
+    if (!target) return sendJSON(res, 404, { error: "Conta não encontrada." });
+    const { hash, salt } = hashPassword(newPassword);
+    db.prepare("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?").run(hash, salt, targetId);
+    return sendJSON(res, 200, { ok: true });
+  }
+
+  // Listar contas (id, username, nome, papel) — só a direcção, para poder repor senhas
+  if (req.method === "GET" && urlPath === "/api/accounts") {
+    if (user.role !== "secretary") return sendJSON(res, 403, { error: "Só a direcção pode ver as contas." });
+    const rows = db.prepare("SELECT id, username, role, name, member_id FROM users ORDER BY name").all();
+    return sendJSON(res, 200, { accounts: rows.map(sanitizeUser) });
   }
 
   if (req.method === "GET" && urlPath === "/api/state") {
