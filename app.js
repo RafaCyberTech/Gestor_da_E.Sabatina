@@ -545,12 +545,12 @@ function loginView() {
           <div class="form-grid">
             <div class="field">
               <label for="username">Usuário</label>
-              <input id="username" name="username" autocomplete="username" value="secretario" />
+              <input id="username" name="username" autocomplete="username" value="" />
             </div>
             <div class="field">
               <label for="password">Senha</label>
               <div style="display:flex;gap:8px;align-items:center;">
-                <input id="password" name="password" type="password" autocomplete="current-password" value="Direcao26" style="flex:1;" />
+                <input id="password" name="password" type="password" autocomplete="current-password" value="" style="flex:1;" />
                 <button type="button" data-action="toggle-password" style="padding:8px;background:none;border:none;cursor:pointer;color:#58706b;">${icon("eye")}</button>
               </div>
             </div>
