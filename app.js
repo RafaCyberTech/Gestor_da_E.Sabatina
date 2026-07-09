@@ -1,4 +1,3 @@
-const STORAGE_KEY = "iasd_escola_sabatina_v2";
 const LOGO_MAIN = "./logo/logo-main.png";
 const LOGO_SECONDARY = "./logo/logo-secondary.png";
 
@@ -134,55 +133,7 @@ const seed = () => ({
       active: true,
     },
   ],
-  users: [
-    {
-      id: "u0",
-      username: "secretario",
-      password: "Direcao26",
-      role: "secretary",
-      name: "Secretário Geral",
-    },
-    {
-      id: "u1",
-      username: "joaquim",
-      password: "Membro26",
-      role: "member",
-      name: "Joaquim Paulo",
-      memberId: "m1",
-    },
-    {
-      id: "u2",
-      username: "maria",
-      password: "Membro26",
-      role: "member",
-      name: "Maria Lúcia",
-      memberId: "m2",
-    },
-    {
-      id: "u3",
-      username: "anselmo",
-      password: "Membro26",
-      role: "member",
-      name: "Anselmo Cossa",
-      memberId: "m3",
-    },
-    {
-      id: "u4",
-      username: "lurdes",
-      password: "Membro26",
-      role: "member",
-      name: "Lurdes Nhampossa",
-      memberId: "m4",
-    },
-    {
-      id: "u5",
-      username: "antônio",
-      password: "Membro26",
-      role: "member",
-      name: "António Mucavele",
-      memberId: "m5",
-    },
-  ],
+  users: [],
   attendance: [
     {
       id: "a1",
@@ -318,33 +269,97 @@ function uid(prefix) {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return seed();
+const TOKEN_KEY = "iasd_escola_sabatina_token";
+const UI_KEY = "iasd_escola_sabatina_ui_v1";
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+async function apiFetch(path, options = {}) {
+  const token = getToken();
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const response = await fetch(path, { ...options, headers });
+  let data = null;
   try {
-    const parsed = JSON.parse(raw);
-    return {
-      ...seed(),
-      ...parsed,
-      ui: { ...seed().ui, ...(parsed.ui || {}) },
-      settings: { ...seed().settings, ...(parsed.settings || {}) },
-    };
+    data = await response.json();
   } catch {
-    return seed();
+    data = null;
+  }
+  if (response.status === 401) {
+    setToken(null);
+    state.session = null;
+    state.currentUser = null;
+    render();
+    throw new Error((data && data.error) || "Sessão expirada.");
+  }
+  if (!response.ok) {
+    throw new Error((data && data.error) || "Ocorreu um erro ao comunicar com o servidor.");
+  }
+  return data;
+}
+
+function loadLocalUI() {
+  try {
+    const raw = localStorage.getItem(UI_KEY);
+    if (!raw) return seed().ui;
+    return { ...seed().ui, ...JSON.parse(raw) };
+  } catch {
+    return seed().ui;
   }
 }
 
-function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function persistUiLocal() {
+  try {
+    localStorage.setItem(UI_KEY, JSON.stringify(state.ui));
+  } catch {
+    // Se o armazenamento local falhar (ex: modo privado), a app continua a funcionar.
+  }
 }
 
-let state = loadState();
+const SHARED_KEYS = ["settings", "classes", "members", "attendance", "lessons", "quarterlyRequests", "weeklyReports", "programs"];
+
+function sharedDataSlice() {
+  const out = {};
+  SHARED_KEYS.forEach((key) => {
+    out[key] = state[key];
+  });
+  return out;
+}
+
+// persist() é chamado por toda a aplicação depois de qualquer alteração ao
+// estado. Continua síncrono na chamada (para não obrigar a mudar as dezenas
+// de sítios que o invocam), mas por trás envia os dados partilhados ao
+// servidor sempre que quem está a usar a app é a secretaria. Alterações só
+// de interface (ui) ficam gravadas apenas neste dispositivo.
+function persist() {
+  persistUiLocal();
+  if (isSecretary()) {
+    apiFetch("/api/state", { method: "POST", body: JSON.stringify(sharedDataSlice()) }).catch((err) => {
+      console.error("Falha ao gravar dados no servidor:", err);
+    });
+  }
+}
+
+async function loadSharedState() {
+  const data = await apiFetch("/api/state");
+  Object.assign(state, data);
+}
+
+let state = seed();
+state.ui = loadLocalUI();
+state.currentUser = null;
+
 
 const app = document.getElementById("app");
 
 function currentUser() {
-  if (!state.session) return null;
-  return state.users.find((user) => user.id === state.session.userId) || null;
+  return state.currentUser || null;
 }
 
 function currentMember() {
@@ -2248,17 +2263,27 @@ function wireEvents() {
 
   document.querySelectorAll("[data-action='logout']").forEach((button) => {
     button.addEventListener("click", () => {
-      state.session = null;
-      persist();
+      apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+      setToken(null);
+      const ui = state.ui;
+      state = seed();
+      state.ui = ui;
+      state.currentUser = null;
       render();
     });
   });
 
   document.querySelectorAll("[data-action='reset-demo']").forEach((button) => {
-    button.addEventListener("click", () => {
-      state = seed();
-      persist();
-      render();
+    button.addEventListener("click", async () => {
+      if (!isSecretary()) return;
+      if (!window.confirm("Repor os dados de demonstração para toda a gente? Esta acção não pode ser desfeita.")) return;
+      try {
+        const data = await apiFetch("/api/admin/reset", { method: "POST" });
+        Object.assign(state, data);
+        render();
+      } catch (err) {
+        alert(err.message || "Não foi possível repor os dados.");
+      }
     });
   });
 
@@ -2422,23 +2447,39 @@ function wireEvents() {
   }
 }
 
-function handleLogin(event) {
+async function handleLogin(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const username = form.username.value.trim();
   const password = form.password.value.trim();
-  const user = state.users.find((item) => item.username === username && item.password === password);
-  if (!user) {
-    alert("Utilizador ou senha inválidos.");
-    return;
+  const submitButton = form.querySelector("button[type='submit']");
+  if (submitButton) submitButton.disabled = true;
+  try {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      alert((data && data.error) || "Utilizador ou senha inválidos.");
+      return;
+    }
+    setToken(data.token);
+    state.currentUser = data.user;
+    state.session = { userId: data.user.id };
+    await loadSharedState();
+    state.ui.view = "dashboard";
+    render();
+  } catch (err) {
+    console.error(err);
+    alert("Não foi possível ligar ao servidor. Verifique a sua ligação à internet.");
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
-  state.session = { userId: user.id };
-  state.ui.view = "dashboard";
-  persist();
-  render();
 }
 
-function handleMemberSubmit(event) {
+async function handleMemberSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const payload = {
@@ -2454,24 +2495,25 @@ function handleMemberSubmit(event) {
   } else {
     const newMemberId = uid("m");
     state.members.push({ id: newMemberId, ...payload });
-    
-    // Criar automaticamente um usuário para o novo membro
+
+    // Criar automaticamente uma conta de acesso para o novo membro.
+    // A senha é escolhida e encriptada no servidor; nunca circula em claro
+    // no lado do cliente.
     const baseUsername = payload.name.split(" ")[0].toLowerCase();
-    let username = baseUsername;
-    let suffix = 2;
-    while (state.users.some((user) => user.username === username)) {
-      username = `${baseUsername}${suffix}`;
-      suffix += 1;
+    try {
+      await apiFetch("/api/accounts", {
+        method: "POST",
+        body: JSON.stringify({
+          username: baseUsername,
+          password: "Membro26",
+          name: payload.name,
+          memberId: newMemberId,
+        }),
+      });
+    } catch (err) {
+      console.error(err);
+      alert("O membro foi guardado, mas não foi possível criar a conta de acesso: " + err.message);
     }
-    const newUserId = uid("u");
-    state.users.push({
-      id: newUserId,
-      username,
-      password: "Membro26",
-      role: "member",
-      name: payload.name,
-      memberId: newMemberId,
-    });
   }
   state.ui.editMemberId = null;
   persist();
@@ -2626,26 +2668,29 @@ function handleWeeklyReportSubmit(event) {
   render();
 }
 
-function handleMessageSubmit(event) {
+async function handleMessageSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
-  const user = currentUser();
   const member = currentMember();
   const target = form.querySelector("#messageTarget").value;
   const classId = form.querySelector("#messageClassId").value || null;
-  state.messages.push({
-    id: uid("msg"),
-    createdAt: todayISO(),
-    from: user?.name || "Utilizador",
-    fromRole: user?.role || "member",
-    target,
-    classId: isSecretary() ? (target === "all" ? null : target) : member?.classId || classId,
-    subject: form.querySelector("#messageSubject").value.trim(),
-    body: form.querySelector("#messageBody").value.trim(),
-    read: false,
-  });
-  persist();
-  render();
+  const subject = form.querySelector("#messageSubject").value.trim();
+  const body = form.querySelector("#messageBody").value.trim();
+  try {
+    const data = await apiFetch("/api/messages", {
+      method: "POST",
+      body: JSON.stringify({
+        target,
+        classId: isSecretary() ? classId : member?.classId || classId,
+        subject,
+        body,
+      }),
+    });
+    state.messages = data.messages;
+    render();
+  } catch (err) {
+    alert(err.message || "Não foi possível enviar a mensagem.");
+  }
 }
 
 function printReport() {
@@ -2979,13 +3024,12 @@ function navigateTo(view) {
   render();
 }
 
-function removeRecord(kind, id) {
+async function removeRecord(kind, id) {
   const labels = {
     member: "membro",
     lesson: "lição",
     request: "requisição",
     program: "item do programa",
-    message: "mensagem",
     attendance: "registo de presença",
   };
 
@@ -2998,7 +3042,6 @@ function removeRecord(kind, id) {
     lesson: "lessons",
     request: "quarterlyRequests",
     program: "programs",
-    message: "messages",
     attendance: "attendance",
   };
 
@@ -3007,9 +3050,13 @@ function removeRecord(kind, id) {
   state[key] = state[key].filter((item) => item.id !== id);
 
   if (kind === "member") {
-    // Remove a conta de utilizador ligada a este membro e limpar as
-    // presenças registadas em seu nome, para não deixar dados órfãos.
-    state.users = state.users.filter((user) => user.memberId !== id);
+    // Remove a conta de acesso ligada a este membro (no servidor) e limpar
+    // as presenças registadas em seu nome, para não deixar dados órfãos.
+    try {
+      await apiFetch(`/api/accounts/member/${encodeURIComponent(id)}`, { method: "DELETE" });
+    } catch (err) {
+      console.error("Falha ao remover a conta associada ao membro:", err);
+    }
     state.attendance.forEach((session) => {
       session.entries = (session.entries || []).filter((entry) => entry.memberId !== id);
     });
@@ -3017,6 +3064,16 @@ function removeRecord(kind, id) {
 
   persist();
   render();
+}
+
+async function removeMessage(id) {
+  try {
+    const data = await apiFetch(`/api/messages/${encodeURIComponent(id)}`, { method: "DELETE" });
+    state.messages = data.messages;
+    render();
+  } catch (err) {
+    alert(err.message || "Não foi possível remover a mensagem.");
+  }
 }
 
 function recentActivityItems() {
@@ -3622,7 +3679,8 @@ if (!globalThis.__iasdCleanupBound) {
         alert("Só pode remover a sua própria mensagem.");
         return;
       }
-      removeRecord("message", id);
+      if (!window.confirm("Remover esta mensagem?")) return;
+      removeMessage(id);
     }
   });
   globalThis.__iasdCleanupBound = true;
@@ -3630,5 +3688,24 @@ if (!globalThis.__iasdCleanupBound) {
 
 
 
-render();
+async function boot() {
+  render(); // mostra o ecrã de login imediatamente, sem esperar pela rede
+  const token = getToken();
+  if (!token) return;
+  try {
+    const me = await apiFetch("/api/auth/me");
+    state.currentUser = me.user;
+    state.session = { userId: me.user.id };
+    await loadSharedState();
+    render();
+  } catch (err) {
+    // Token inválido ou expirado: fica no ecrã de login.
+    setToken(null);
+    state.currentUser = null;
+    state.session = null;
+    render();
+  }
+}
+
+boot();
 
