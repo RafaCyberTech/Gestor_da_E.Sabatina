@@ -80,173 +80,27 @@ const seed = () => ({
     sidebarOpen: false,
   },
   classes: [
-    { id: "classe-01-adultos", name: "Classe 01-Adultos", leader: "Irm. Responsável" },
-    { id: "classe-02-adultos", name: "Classe 02-Adultos", leader: "Irm. Responsável" },
-    { id: "classe-03-adultos", name: "Classe 03-Adultos", leader: "Irm. Responsável" },
-    { id: "classe-04-adultos", name: "Classe 04-Adultos", leader: "Irm. Responsável" },
-    { id: "classe-05-adultos", name: "Classe 05-Adultos", leader: "Irm. Responsável" },
-    { id: "pos-batismal", name: "Pos-Batismal", leader: "Irm. Responsável" },
-    { id: "batismal", name: "Batismal", leader: "Irm. Responsável" },
-    { id: "juvenis", name: "Juvenis", leader: "Irm. Responsavel" },
-    { id: "primarios", name: "Primarios", leader: "Irm. Responsável" },
-    { id: "jardim-de-infancia", name: "Jardim de infancia", leader: "Irm. Responsável" },
-    { id: "rol-de-berco", name: "Rol de Berco", leader: "Irm. Responsável" },
-    { id: "adolescentes", name: "Adolescentes", leader: "Irm. Responsável" },
+    { id: "classe-01-adultos", name: "Classe 01-Adultos" },
+    { id: "classe-02-adultos", name: "Classe 02-Adultos" },
+    { id: "classe-03-adultos", name: "Classe 03-Adultos" },
+    { id: "classe-04-adultos", name: "Classe 04-Adultos" },
+    { id: "classe-05-adultos", name: "Classe 05-Adultos" },
+    { id: "pos-batismal", name: "Pos-Batismal" },
+    { id: "batismal", name: "Batismal" },
+    { id: "juvenis", name: "Juvenis" },
+    { id: "primarios", name: "Primarios" },
+    { id: "jardim-de-infancia", name: "Jardim de infancia" },
+    { id: "rol-de-berco", name: "Rol de Berco" },
+    { id: "adolescentes", name: "Adolescentes" },
   ],
-  members: [
-    {
-      id: "m1",
-      name: "Joaquim Paulo",
-      classId: "classe-01-adultos",
-      contact: "+258 82 000 0001",
-      joinedAt: "2025-01-12",
-      active: true,
-    },
-    {
-      id: "m2",
-      name: "Maria Lúcia",
-      classId: "classe-02-adultos",
-      contact: "+258 82 000 0002",
-      joinedAt: "2025-03-18",
-      active: true,
-    },
-    {
-      id: "m3",
-      name: "Anselmo Cossa",
-      classId: "primarios",
-      contact: "+258 82 000 0003",
-      joinedAt: "2025-06-02",
-      active: true,
-    },
-    {
-      id: "m4",
-      name: "Dalma Nhampossa",
-      classId: "adolescentes",
-      contact: "+258 82 000 0004",
-      joinedAt: "2025-07-06",
-      active: true,
-    },
-    {
-      id: "m5",
-      name: "Hebenezer Paculeque",
-      classId: "pos-batismal",
-      contact: "+258 82 000 0005",
-      joinedAt: "2025-08-10",
-      active: true,
-    },
-  ],
+  members: [],
   users: [],
-  attendance: [
-    {
-      id: "a1",
-      date: todayISO(),
-      classId: "classe-01-adultos",
-      visitorCount: 2,
-      note: "Visita de classe 02-Adultos.",
-      entries: [
-        { memberId: "m1", status: "presente" },
-        { memberId: "m5", status: "presente" },
-      ],
-    },
-    {
-      id: "a2",
-      date: todayISO(-7),
-      classId: "adolescentes",
-      visitorCount: 1,
-      note: "",
-      entries: [{ memberId: "m4", status: "presente" }],
-    },
-  ],
-  lessons: [
-    {
-      id: "l1",
-      date: todayISO(),
-      quarter: currentQuarter(),
-      classId: "classe-01-adultos",
-      topic: "A graça que sustenta a igreja",
-      leader: "Irm. Responsável",
-    },
-    {
-      id: "l2",
-      date: todayISO(-7),
-      quarter: currentQuarter(),
-      classId: "adolescentes",
-      topic: "Fé prática para a semana",
-      leader: "Irm. Nelson",
-    },
-  ],
-  quarterlyRequests: [
-    {
-      id: "q1",
-      quarter: currentQuarter(),
-      classId: "classe-01-adultos",
-      quantity: 12,
-      createdAt: todayISO(),
-      status: "Enviado",
-    },
-    {
-      id: "q2",
-      quarter: currentQuarter(),
-      classId: "classe-02-adultos",
-      quantity: 8,
-      createdAt: todayISO(),
-      status: "Pendente",
-    },
-  ],
+  attendance: [],
+  lessons: [],
+  quarterlyRequests: [],
   weeklyReports: [],
-  programs: [
-    {
-      id: "p1",
-      date: nextSaturdayISO(),
-      order: 1,
-      time: "08:00",
-      activity: "Abertura e cânticos",
-      responsible: "Classe 02-Adultos",
-      classId: "classe-02-adultos",
-    },
-    {
-      id: "p2",
-      date: nextSaturdayISO(),
-      order: 2,
-      time: "08:15",
-      activity: "Lição da Escola Sabatina",
-      responsible: "Classe 01-Adultos",
-      classId: "classe-01-adultos",
-    },
-    {
-      id: "p3",
-      date: nextSaturdayISO(),
-      order: 3,
-      time: "09:00",
-      activity: "Momento de testemunhos",
-      responsible: "Adolescentes",
-      classId: "adolescentes",
-    },
-  ],
-  messages: [
-    {
-      id: "msg1",
-      createdAt: todayISO(),
-      from: "Maria Lúcia",
-      fromRole: "member",
-      target: "secretary",
-      classId: "classe-02-adultos",
-      subject: "Pedido de oração",
-      body: "Gostaria de pedir oração pela família da irmã Celina.",
-      read: false,
-    },
-    {
-      id: "msg2",
-      createdAt: todayISO(),
-      from: "Secretário Geral",
-      fromRole: "secretary",
-      target: "all",
-      classId: null,
-      subject: "Programa de sábado confirmado",
-      body: "O programa do próximo sábado está publicado no sistema.",
-      read: false,
-    },
-  ],
+  programs: [],
+  messages: [],
 });
 
 
@@ -545,12 +399,12 @@ function loginView() {
           <div class="form-grid">
             <div class="field">
               <label for="username">Usuário</label>
-              <input id="username" name="username" autocomplete="username" value="" />
+              <input id="username" name="username" autocomplete="username" placeholder="Ex: DIRECAO ou o seu primeiro nome" autofocus />
             </div>
             <div class="field">
               <label for="password">Senha</label>
               <div style="display:flex;gap:8px;align-items:center;">
-                <input id="password" name="password" type="password" autocomplete="current-password" value="" style="flex:1;" />
+                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Senha" style="flex:1;" />
                 <button type="button" data-action="toggle-password" style="padding:8px;background:none;border:none;cursor:pointer;color:#58706b;">${icon("eye")}</button>
               </div>
             </div>
@@ -2070,20 +1924,6 @@ function wireEvents() {
     });
   });
 
-  document.querySelectorAll("[data-action='reset-demo']").forEach((button) => {
-    button.addEventListener("click", async () => {
-      if (!isSecretary()) return;
-      if (!window.confirm("Repor os dados de demonstração para toda a gente? Esta acção não pode ser desfeita.")) return;
-      try {
-        const data = await apiFetch("/api/admin/reset", { method: "POST" });
-        Object.assign(state, data);
-        render();
-      } catch (err) {
-        alert(err.message || "Não foi possível repor os dados.");
-      }
-    });
-  });
-
   const memberForm = document.getElementById("memberForm");
   if (memberForm) memberForm.addEventListener("submit", handleMemberSubmit);
 
@@ -2341,23 +2181,46 @@ async function handleMemberSubmit(event) {
     const newMemberId = uid("m");
     state.members.push({ id: newMemberId, ...payload });
 
-    // Criar automaticamente uma conta de acesso para o novo membro.
-    // A senha é escolhida e encriptada no servidor; nunca circula em claro
-    // no lado do cliente.
+    // Criar automaticamente uma conta de acesso para o novo membro, usando
+    // o primeiro nome como utilizador. A senha é escolhida e encriptada no
+    // servidor; nunca circula em claro no lado do cliente. Se já existir
+    // alguém com o mesmo primeiro nome, acrescenta-se um número (ex:
+    // "joao2") para que o utilizador seja sempre único.
     const baseUsername = payload.name.split(" ")[0].toLowerCase();
-    try {
-      await apiFetch("/api/accounts", {
-        method: "POST",
-        body: JSON.stringify({
-          username: baseUsername,
-          password: "Membro26",
-          name: payload.name,
-          memberId: newMemberId,
-        }),
-      });
-    } catch (err) {
-      console.error(err);
-      alert("O membro foi guardado, mas não foi possível criar a conta de acesso: " + err.message);
+    let attemptUsername = baseUsername;
+    let attempt = 1;
+    let created = false;
+    let lastError = null;
+    while (!created && attempt <= 20) {
+      try {
+        await apiFetch("/api/accounts", {
+          method: "POST",
+          body: JSON.stringify({
+            username: attemptUsername,
+            password: "Membro26",
+            name: payload.name,
+            memberId: newMemberId,
+          }),
+        });
+        created = true;
+      } catch (err) {
+        lastError = err;
+        if (/já existe/i.test(err.message || "")) {
+          attempt += 1;
+          attemptUsername = `${baseUsername}${attempt}`;
+        } else {
+          break;
+        }
+      }
+    }
+    if (!created) {
+      console.error(lastError);
+      alert(
+        "O membro foi guardado, mas não foi possível criar a conta de acesso: " +
+          (lastError?.message || "erro desconhecido")
+      );
+    } else if (attemptUsername !== baseUsername) {
+      alert(`Conta de acesso criada com o utilizador "${attemptUsername}" (já existia outro membro chamado "${baseUsername}").`);
     }
   }
   state.ui.editMemberId = null;

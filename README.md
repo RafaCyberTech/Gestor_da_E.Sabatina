@@ -15,23 +15,49 @@ informação, esteja onde estiver).
 ## Como executar localmente
 
 ```bash
-node server.js
+node servidor.js
 ```
 
 Depois abra `http://127.0.0.1:4173` no navegador.
 
 A base de dados fica gravada em `data/escola-sabatina.db` (criada
-automaticamente na primeira execução, com os dados de demonstração).
+automaticamente e vazia na primeira execução — ver "Primeiro acesso"
+abaixo).
 
-## Contas de demonstração
+## Primeiro acesso
 
-- `DIRECAO` / `@Direcao26` — acesso total (direcção)
-- `MEMBRO` / `#Membro26` — acesso de membro
+A base de dados começa vazia — sem membros, presenças, lições ou
+turmas com dados fictícios (só a lista de turmas/classes já vem
+configurada, pois essa é a estrutura da própria igreja). Todos os
+dados são cadastrados pela direcção conforme forem usando o sistema.
 
-**Mude estas senhas antes de disponibilizar a aplicação a sério.** Cada
-utilizador pode mudar a sua própria senha em **Minha Conta**, dentro da
-aplicação (menu lateral). A direcção também pode repor a senha de
-qualquer conta a partir dessa mesma página, caso alguém esqueça a sua.
+Na primeira vez que o servidor arrancar, é criada automaticamente uma
+única conta de acesso, **DIRECAO**, com uma senha aleatória que
+aparece **uma única vez** na consola/terminal onde o `node servidor.js`
+está a correr, por exemplo:
+
+```
+Conta inicial criada: DIRECAO / aB3xQ9zK
+IMPORTANTE: mude esta senha assim que entrar (menu Minha Conta).
+```
+
+Anote essa senha, entre com ela, e mude-a imediatamente em **Minha
+Conta** (menu lateral). Se a perder antes de mudar, apague o ficheiro
+`data/escola-sabatina.db` e arranque o servidor de novo para gerar uma
+conta nova (isto apaga todos os dados — só faça isto antes de começar
+a cadastrar informação a sério).
+
+Contas de **membro** não precisam de ser criadas à mão: sempre que a
+direcção cadastra um novo membro em **Membros**, o sistema cria a
+conta de acesso dele automaticamente, usando o **primeiro nome em
+minúsculas** como utilizador (ex: "Anabela Muianga" → utilizador
+`anabela`) e a senha inicial `Membro26`. Se já existir outro membro
+com o mesmo primeiro nome, o sistema acrescenta um número (`anabela2`,
+`anabela3`, ...) para o utilizador ser sempre único, e avisa a
+direcção qual foi o nome atribuído. Cada membro deve mudar essa senha
+inicial em **Minha Conta** assim que entrar pela primeira vez; a
+direcção também pode repor a senha de qualquer conta a partir de
+**Minha Conta**, caso alguém esqueça a sua.
 
 ## Segurança
 
@@ -56,7 +82,7 @@ apaga as mais antigas automaticamente. Pode ajustar isto com variáveis
 de ambiente:
 
 ```bash
-BACKUP_INTERVAL_HOURS=6 BACKUP_KEEP=28 node server.js
+BACKUP_INTERVAL_HOURS=6 BACKUP_KEEP=28 node servidor.js
 ```
 
 Isto complementa, mas não substitui, uma cópia de segurança externa
@@ -73,7 +99,7 @@ Pontos importantes:
    pela internet, nunca exponha isto só em HTTP simples. A maioria dos
    serviços de hospedagem (Render, Railway, Fly.io) já dá HTTPS
    automaticamente. Numa VPS própria, use algo como Caddy ou Nginx com
-   Let's Encrypt à frente do `node server.js`.
+   Let's Encrypt à frente do `node servidor.js`.
 2. **Guarde a pasta `data/`** — é onde ficam a base de dados e as
    cópias de segurança automáticas. Confirme que o seu plano de
    hospedagem tem "disco persistente" ou "volume" — em muitos planos
@@ -81,8 +107,9 @@ Pontos importantes:
    reinício.
 3. **Variável `PORT`** — a maioria dos serviços de hospedagem define
    automaticamente a variável de ambiente `PORT`; o servidor já a lê.
-4. **Mude as senhas de demonstração** antes de anunciar o acesso a
-   sério (ver secção "Contas de demonstração" acima).
+4. **Mude a senha inicial da conta DIRECAO** assim que entrar pela
+   primeira vez, antes de anunciar o acesso a sério (ver secção
+   "Primeiro acesso" acima).
 
 ## O que está incluído
 

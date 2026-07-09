@@ -81,66 +81,38 @@ function todayISO(offsetDays = 0) {
   d.setDate(d.getDate() + offsetDays);
   return localISODate(d);
 }
-function currentQuarter() {
-  const d = new Date();
-  const quarter = Math.floor(d.getMonth() / 3) + 1;
-  return `${d.getFullYear()}-T${quarter}`;
-}
-
 function defaultAppData() {
   return {
     settings: { attendanceWeight: 50, lessonWeight: 30, participationWeight: 20 },
     classes: [
-      { id: "classe-01-adultos", name: "Classe 01-Adultos", leader: "Irm. Responsável" },
-      { id: "classe-02-adultos", name: "Classe 02-Adultos", leader: "Irm. Responsável" },
-      { id: "classe-03-adultos", name: "Classe 03-Adultos", leader: "Irm. Responsável" },
-      { id: "classe-04-adultos", name: "Classe 04-Adultos", leader: "Irm. Responsável" },
-      { id: "classe-05-adultos", name: "Classe 05-Adultos", leader: "Irm. Responsável" },
-      { id: "pos-batismal", name: "Pos-Batismal", leader: "Irm. Responsável" },
-      { id: "batismal", name: "Batismal", leader: "Irm. Responsável" },
-      { id: "juvenis", name: "Juvenis", leader: "Irm. Responsavel" },
-      { id: "primarios", name: "Primarios", leader: "Irm. Responsável" },
-      { id: "jardim-de-infancia", name: "Jardim de infancia", leader: "Irm. Responsável" },
-      { id: "rol-de-berco", name: "Rol de Berco", leader: "Irm. Responsável" },
-      { id: "adolescentes", name: "Adolescentes", leader: "Irm. Responsável" },
+      { id: "classe-01-adultos", name: "Classe 01-Adultos" },
+      { id: "classe-02-adultos", name: "Classe 02-Adultos" },
+      { id: "classe-03-adultos", name: "Classe 03-Adultos" },
+      { id: "classe-04-adultos", name: "Classe 04-Adultos" },
+      { id: "classe-05-adultos", name: "Classe 05-Adultos" },
+      { id: "pos-batismal", name: "Pos-Batismal" },
+      { id: "batismal", name: "Batismal" },
+      { id: "juvenis", name: "Juvenis" },
+      { id: "primarios", name: "Primarios" },
+      { id: "jardim-de-infancia", name: "Jardim de infancia" },
+      { id: "rol-de-berco", name: "Rol de Berco" },
+      { id: "adolescentes", name: "Adolescentes" },
     ],
-    members: [
-      { id: "m1", name: "Joaquim Paulo", classId: "classe-01-adultos", contact: "+258 82 000 0001", joinedAt: "2025-01-12", active: true },
-      { id: "m2", name: "Maria Lúcia", classId: "classe-02-adultos", contact: "+258 82 000 0002", joinedAt: "2025-03-18", active: true },
-      { id: "m3", name: "Anselmo Cossa", classId: "primarios", contact: "+258 82 000 0003", joinedAt: "2025-06-02", active: true },
-      { id: "m4", name: "Dalma Nhampossa", classId: "adolescentes", contact: "+258 82 000 0004", joinedAt: "2025-07-06", active: true },
-      { id: "m5", name: "Hebenezer Paculeque", classId: "pos-batismal", contact: "+258 82 000 0005", joinedAt: "2025-08-10", active: true },
-    ],
-    attendance: [
-      {
-        id: "a1",
-        date: todayISO(),
-        classId: "classe-01-adultos",
-        visitorCount: 2,
-        note: "Visita de classe 02-Adultos.",
-        entries: [{ memberId: "m1", status: "presente" }],
-      },
-      {
-        id: "a2",
-        date: todayISO(-7),
-        classId: "adolescentes",
-        visitorCount: 0,
-        note: "",
-        entries: [{ memberId: "m4", status: "presente" }],
-      },
-    ],
-    lessons: [
-      { id: "l1", date: todayISO(), quarter: currentQuarter(), classId: "classe-01-adultos", topic: "A graça que sustenta a igreja", leader: "Irm. Responsável" },
-      { id: "l2", date: todayISO(-7), quarter: currentQuarter(), classId: "adolescentes", topic: "Fé prática para a semana", leader: "Irm. Nelson" },
-    ],
-    quarterlyRequests: [
-      { id: "q1", quarter: currentQuarter(), classId: "classe-01-adultos", quantity: 12, createdAt: todayISO() },
-    ],
+    members: [],
+    attendance: [],
+    lessons: [],
+    quarterlyRequests: [],
     weeklyReports: [],
     programs: [],
     messages: [],
   };
 }
+
+// Senha inicial da conta DIRECAO, gerada aleatoriamente a cada primeira
+// execução (só é usada se a base de dados ainda não tiver nenhum
+// utilizador). É impressa uma única vez na consola do servidor — anote-a
+// e mude-a logo a seguir em Minha Conta.
+const INITIAL_DIRECAO_PASSWORD = crypto.randomBytes(6).toString("base64url");
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
   const hash = crypto.scryptSync(password, salt, 64).toString("hex");
@@ -209,19 +181,16 @@ function seedIfEmpty() {
   }
   const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
   if (userCount === 0) {
-    const demoUsers = [
-      { id: "u0", username: "DIRECAO", password: "@Direcao26", role: "secretary", name: "Direção", memberId: null },
-      { id: "u1", username: "MEMBRO", password: "#Membro26", role: "member", name: "Membro", memberId: null },
-    ];
-    const insert = db.prepare(
-      "INSERT INTO users (id, username, password_hash, salt, role, name, member_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    );
-    for (const u of demoUsers) {
-      const { hash, salt } = hashPassword(u.password);
-      insert.run(u.id, u.username, hash, salt, u.role, u.name, u.memberId);
-    }
-    console.log("Contas de demonstração criadas: DIRECAO/@Direcao26, MEMBRO/#Membro26");
-    console.log("IMPORTANTE: mude estas senhas antes de usar em produção (ver README.md).");
+    // Cria apenas a conta inicial da direcção, para poder entrar pela
+    // primeira vez e começar a cadastrar membros (que geram as suas
+    // próprias contas automaticamente — ver rota /api/accounts).
+    const id = "u0";
+    const { hash, salt } = hashPassword(INITIAL_DIRECAO_PASSWORD);
+    db.prepare(
+      "INSERT INTO users (id, username, password_hash, salt, role, name, member_id) VALUES (?, ?, ?, ?, 'secretary', ?, ?)"
+    ).run(id, "DIRECAO", hash, salt, "Direção", null);
+    console.log("Conta inicial criada: DIRECAO / " + INITIAL_DIRECAO_PASSWORD);
+    console.log("IMPORTANTE: mude esta senha assim que entrar (menu Minha Conta).");
   }
 }
 seedIfEmpty();
@@ -500,13 +469,6 @@ async function handleApi(req, res, urlPath) {
       db.prepare("DELETE FROM users WHERE id = ?").run(r.id);
     }
     return sendJSON(res, 200, { ok: true });
-  }
-
-  // Reset dos dados de demonstração — só a direcção
-  if (req.method === "POST" && urlPath === "/api/admin/reset") {
-    if (user.role !== "secretary") return sendJSON(res, 403, { error: "Só a direcção pode repor os dados." });
-    setAppData(defaultAppData());
-    return sendJSON(res, 200, getAppData());
   }
 
   return sendJSON(res, 404, { error: "Rota não encontrada." });
