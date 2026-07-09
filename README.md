@@ -25,8 +25,8 @@ automaticamente na primeira execução, com os dados de demonstração).
 
 ## Contas de demonstração
 
-- `secretario` / `Direcao26` — acesso total (direcção)
-- `joaquim`, `maria`, `anselmo`, `lurdes`, `antonio` / `Membro26` — acesso de membro
+- `DIRECAO` / `@Direcao26` — acesso total (direcção)
+- `MEMBRO` / `#Membro26` — acesso de membro
 
 **Mude estas senhas antes de disponibilizar a aplicação a sério.** Cada
 utilizador pode mudar a sua própria senha em **Minha Conta**, dentro da
@@ -116,9 +116,8 @@ campo/registo em vez de por documento inteiro).
 
 ## Logótipos
 
-Os ficheiros `logo/logo-main.svg` e `logo/logo-secondary.svg` são
-ilustrações genéricas criadas para o projecto não ficar com imagens
-partidas — não são o logótipo oficial da IASD. Substitua-os pelos
-logótipos reais da igreja quando os tiver disponíveis (podem ser `.svg`
-ou `.png` — só é preciso ajustar as extensões em `LOGO_MAIN` e
-`LOGO_SECONDARY` no topo do `app.js` se usar `.png`).
+A aplicação espera encontrar os ficheiros `logo/logo-main.png` e
+`logo/logo-secondary.png` na pasta do projecto (crie a pasta `logo/` e
+coloque lá os logótipos da igreja). Se preferir usar `.svg` ou outro
+formato, ajuste as extensões em `LOGO_MAIN` e `LOGO_SECONDARY` no topo
+do `app.js`.

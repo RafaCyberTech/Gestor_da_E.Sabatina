@@ -210,12 +210,8 @@ function seedIfEmpty() {
   const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
   if (userCount === 0) {
     const demoUsers = [
-      { id: "u0", username: "secretario", password: "Direcao26", role: "secretary", name: "Secretário Geral", memberId: null },
-      { id: "u1", username: "joaquim", password: "Membro26", role: "member", name: "Joaquim Paulo", memberId: "m1" },
-      { id: "u2", username: "maria", password: "Membro26", role: "member", name: "Maria Lúcia", memberId: "m2" },
-      { id: "u3", username: "anselmo", password: "Membro26", role: "member", name: "Anselmo Cossa", memberId: "m3" },
-      { id: "u4", username: "lurdes", password: "Membro26", role: "member", name: "Lurdes Nhampossa", memberId: "m4" },
-      { id: "u5", username: "antonio", password: "Membro26", role: "member", name: "António Mucavele", memberId: "m5" },
+      { id: "u0", username: "DIRECAO", password: "@Direcao26", role: "secretary", name: "Direção", memberId: null },
+      { id: "u1", username: "MEMBRO", password: "#Membro26", role: "member", name: "Membro", memberId: null },
     ];
     const insert = db.prepare(
       "INSERT INTO users (id, username, password_hash, salt, role, name, member_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -224,7 +220,7 @@ function seedIfEmpty() {
       const { hash, salt } = hashPassword(u.password);
       insert.run(u.id, u.username, hash, salt, u.role, u.name, u.memberId);
     }
-    console.log("Contas de demonstração criadas: secretario/Direcao26, joaquim/Membro26, maria/Membro26, anselmo/Membro26, lurdes/Membro26, antonio/Membro26");
+    console.log("Contas de demonstração criadas: DIRECAO/@Direcao26, MEMBRO/#Membro26");
     console.log("IMPORTANTE: mude estas senhas antes de usar em produção (ver README.md).");
   }
 }
