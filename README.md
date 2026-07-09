@@ -32,20 +32,12 @@ configurada, pois essa é a estrutura da própria igreja). Todos os
 dados são cadastrados pela direcção conforme forem usando o sistema.
 
 Na primeira vez que o servidor arrancar, é criada automaticamente uma
-única conta de acesso, **DIRECAO**, com uma senha aleatória que
-aparece **uma única vez** na consola/terminal onde o `node servidor.js`
-está a correr, por exemplo:
+única conta de acesso:
 
-```
-Conta inicial criada: DIRECAO / aB3xQ9zK
-IMPORTANTE: mude esta senha assim que entrar (menu Minha Conta).
-```
+- `DIRECAO` / `@Direcao26` — acesso total (direcção)
 
-Anote essa senha, entre com ela, e mude-a imediatamente em **Minha
-Conta** (menu lateral). Se a perder antes de mudar, apague o ficheiro
-`data/escola-sabatina.db` e arranque o servidor de novo para gerar uma
-conta nova (isto apaga todos os dados — só faça isto antes de começar
-a cadastrar informação a sério).
+**Mude esta senha antes de disponibilizar a aplicação a sério**, em
+**Minha Conta** (menu lateral) assim que entrar pela primeira vez.
 
 Contas de **membro** não precisam de ser criadas à mão: sempre que a
 direcção cadastra um novo membro em **Membros**, o sistema cria a

@@ -108,11 +108,10 @@ function defaultAppData() {
   };
 }
 
-// Senha inicial da conta DIRECAO, gerada aleatoriamente a cada primeira
-// execução (só é usada se a base de dados ainda não tiver nenhum
-// utilizador). É impressa uma única vez na consola do servidor — anote-a
-// e mude-a logo a seguir em Minha Conta.
-const INITIAL_DIRECAO_PASSWORD = crypto.randomBytes(6).toString("base64url");
+// Senha inicial da conta DIRECAO (a mesma que já vinha antes). Só é usada
+// para criar a conta na primeira execução, quando a base de dados ainda
+// não tem nenhum utilizador. Mude-a logo a seguir em Minha Conta.
+const INITIAL_DIRECAO_PASSWORD = "@Direcao26";
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
   const hash = crypto.scryptSync(password, salt, 64).toString("hex");
