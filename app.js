@@ -1,5 +1,5 @@
 const LOGO_MAIN = "./logo/logo-main.png";
-const LOGO_SECONDARY = ".logo/logo-secondary.png";
+const LOGO_SECONDARY = "./logo/logo-secondary.png";
 
 // Helper functions - must be defined before seed()
 function localISODate(date) {
