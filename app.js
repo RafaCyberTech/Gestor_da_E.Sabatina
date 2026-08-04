@@ -70,6 +70,7 @@ const seed = () => ({
     requestQuarter: currentQuarter(),
     programDate: nextSaturdayISO(),
     messageMode: "inbox",
+    messageConversationKey: null,
     rankingPeriod: "quarter",
     reportDate: "",
     reportYear: new Date().getFullYear(),
@@ -105,11 +106,12 @@ const seed = () => ({
 
 
 function formatDate(dateString) {
+  const normalized = String(dateString || "").includes("T") ? String(dateString) : `${dateString}T00:00:00`;
   return new Intl.DateTimeFormat("pt-MZ", {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(new Date(`${dateString}T00:00:00`));
+  }).format(new Date(normalized));
 }
 
 function escapeHTML(value) {
@@ -127,6 +129,7 @@ function uid(prefix) {
 
 const TOKEN_KEY = "iasd_escola_sabatina_token";
 const UI_KEY = "iasd_escola_sabatina_ui_v1";
+const MESSAGE_SEEN_KEY = "iasd_escola_sabatina_message_seen_v1";
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -134,6 +137,166 @@ function getToken() {
 function setToken(token) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
+}
+
+function loadMessageSeenState() {
+  try {
+    return JSON.parse(localStorage.getItem(MESSAGE_SEEN_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveMessageSeenState(data) {
+  try {
+    localStorage.setItem(MESSAGE_SEEN_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore storage failures; notifications still work in-session.
+  }
+}
+
+function currentMessageSeenIds() {
+  const user = currentUser();
+  if (!user) return [];
+  const stateData = loadMessageSeenState();
+  return Array.isArray(stateData[user.id]) ? stateData[user.id] : [];
+}
+
+function markMessagesAsSeen(messageIds = null) {
+  const user = currentUser();
+  if (!user) return;
+  const ids = messageIds || visibleMessages().map((message) => message.id);
+  const stateData = loadMessageSeenState();
+  const current = new Set(Array.isArray(stateData[user.id]) ? stateData[user.id] : []);
+  ids.forEach((id) => current.add(id));
+  stateData[user.id] = Array.from(current);
+  saveMessageSeenState(stateData);
+}
+
+function canSeeMessage(user, message) {
+  if (!user || !message) return false;
+  if (user.role === "secretary") return true;
+  if (message.from === user.name && message.fromRole === user.role) return true;
+  if (message.target === "all") return true;
+  if (message.target === "secretary") return true;
+  if (message.target === "member" && message.recipientMemberId && message.recipientMemberId === user.memberId) return true;
+  return false;
+}
+
+function memberIdByName(name) {
+  return state.members.find((member) => member.name === name)?.id || null;
+}
+
+function entityLabelFromKey(key) {
+  if (!key) return "";
+  if (key === "secretary") return "Direcção";
+  if (key === "broadcast") return "Todos os membros";
+  const member = state.members.find((item) => item.id === key);
+  if (member) return member.name;
+  return "Membro";
+}
+
+function conversationKeyForMessage(message) {
+  if (!message) return null;
+  if (message.target === "all") return "broadcast";
+  const senderKey = message.fromRole === "secretary" ? "secretary" : memberIdByName(message.from);
+  let recipientKey = null;
+  if (message.target === "secretary") {
+    recipientKey = "secretary";
+  } else if (message.target === "member") {
+    recipientKey = message.recipientMemberId || memberIdByName(message.recipientName);
+  }
+  if (!senderKey || !recipientKey) return `message:${message.id}`;
+  const pair = [senderKey, recipientKey].sort().join("|");
+  return `direct:${pair}`;
+}
+
+function conversationTitleFromKey(key, messages) {
+  if (key === "broadcast") return "Todos os membros";
+  if (key === "secretary") return "Direcção";
+  if (key.startsWith("direct:")) {
+    const pair = key.slice("direct:".length).split("|");
+    const labels = pair
+      .map((item) => entityLabelFromKey(item))
+      .filter(Boolean)
+      .filter((value, index, arr) => arr.indexOf(value) === index);
+    if (labels.length === 1) return labels[0];
+    if (labels.length >= 2) return labels.join(" · ");
+  }
+  const latest = messages[messages.length - 1];
+  if (latest) return latest.subject || "Conversa";
+  return "Conversa";
+}
+
+function buildConversationSummaries(messages, applyModeFilter = true) {
+  const groups = new Map();
+  const current = currentUser();
+  messages.forEach((message) => {
+    if (!canSeeMessage(current, message)) return;
+    const key = conversationKeyForMessage(message);
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(message);
+  });
+
+  const summaries = Array.from(groups.entries())
+    .map(([key, rows]) => {
+      const sorted = rows.slice().sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+      const latest = sorted[sorted.length - 1] || null;
+      const unreadCount = sorted.filter((message) => message.from !== current?.name && !currentMessageSeenIds().includes(message.id)).length;
+      const hasInbox = sorted.some((message) => message.from !== current?.name);
+      const hasOutbox = sorted.some((message) => message.from === current?.name);
+      return {
+        key,
+        messages: sorted,
+        latest,
+        unreadCount,
+        hasInbox,
+        hasOutbox,
+        title: conversationTitleFromKey(key, sorted),
+      };
+    })
+    .filter((item) => {
+      if (!applyModeFilter) return true;
+      if (state.ui.messageMode === "inbox") return item.hasInbox;
+      if (state.ui.messageMode === "outbox") return item.hasOutbox;
+      return true;
+    })
+    .sort((a, b) => String(b.latest?.createdAt || "").localeCompare(String(a.latest?.createdAt || "")));
+
+  return summaries;
+}
+
+function activeConversationKey(conversations) {
+  if (!conversations.length) return null;
+  const stored = state.ui.messageConversationKey;
+  if (stored && conversations.some((item) => item.key === stored)) return stored;
+  const nextKey = conversations[0].key;
+  state.ui.messageConversationKey = nextKey;
+  persistUiLocal();
+  return nextKey;
+}
+
+function markConversationAsSeen(conversationKey) {
+  if (!conversationKey) return;
+  const user = currentUser();
+  if (!user) return;
+  const ids = visibleMessages()
+    .filter((message) => conversationKeyForMessage(message) === conversationKey)
+    .map((message) => message.id);
+  if (!ids.length) return;
+  markMessagesAsSeen(ids);
+}
+
+function unreadMessageCount() {
+  const user = currentUser();
+  if (!user) return 0;
+  const seen = new Set(currentMessageSeenIds());
+  const conversations = buildConversationSummaries(state.messages, false);
+  return conversations.filter((conversation) =>
+    conversation.messages.some((message) => canSeeMessage(user, message) && message.from !== user.name && !seen.has(message.id))
+  ).length;
 }
 
 async function apiFetch(path, options = {}) {
@@ -245,8 +408,7 @@ function visibleMessages() {
   const user = currentUser();
   if (!user) return [];
   if (isSecretary()) return state.messages;
-  const member = currentMember();
-  return state.messages.filter((msg) => msg.target === "all" || msg.classId === member?.classId || msg.fromRole === "member" && msg.from === user.name);
+  return state.messages.filter((msg) => canSeeMessage(user, msg));
 }
 
 function canModifyMessage(message) {
@@ -419,6 +581,12 @@ function loginView() {
 function shellView() {
   const user = currentUser();
   const secretary = isSecretary();
+  if (state.ui.view === "messages") {
+    const conversations = buildConversationSummaries(visibleMessages(), true);
+    const conversationKey = activeConversationKey(conversations);
+    markConversationAsSeen(conversationKey);
+  }
+  const unreadMessages = unreadMessageCount();
   const navItems = [
     ["dashboard", "Visão Geral", "home"],
     ["members", "Membros", "members"],
@@ -444,7 +612,7 @@ function shellView() {
             .map(
               ([id, label, key]) => `
               <button type="button" class="${state.ui.view === id ? "active" : ""}" data-nav="${id}">
-                ${icon(key)} ${label}
+                ${icon(key)} <span class="nav-label">${escapeHTML(label)}</span>${id === "messages" && unreadMessages ? `<span class="nav-badge">${unreadMessages}</span>` : ""}
               </button>
             `
             )
@@ -469,6 +637,7 @@ function shellView() {
             </div>
           <div class="topbar-actions">
             <span class="chip ${secretary ? "" : "gray"}">${secretary ? "Acesso administrativo" : "Acesso de membro"}</span>
+            ${unreadMessages ? `<span class="chip alt">Novas conversas: ${unreadMessages}</span>` : ""}
           </div>
         </header>
         <div class="content">${renderView()}</div>
@@ -565,6 +734,8 @@ function dashboardView() {
   const memberDeltaLabel = memberDelta === null ? '—' : `${memberDelta >= 0 ? '+' : ''}${memberDelta}% vs T${prevQuarter} ${prevYear}`;
   const prevLabel = `T${prevQuarter} ${prevYear}`;
   const yearOptions = getDashboardYearOptions();
+  const topClass = rankingRows("quarter", state.ui.reportYear, state.ui.reportQuarter)[0];
+  const topClassName = topClass ? topClass.name : "—";
 
   return `
     <style>
@@ -579,6 +750,12 @@ function dashboardView() {
       .dashboard-wrap .filters .field{min-width:160px;}
       .dashboard-wrap .filters label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#3C4E6E;margin-bottom:6px;}
       .dashboard-wrap .filters select{width:100%;padding:10px 12px;border:1px solid #E4DCC9;border-radius:8px;background:#fff;color:#1B2A45;font-size:14px;}
+      .dashboard-wrap .filters .btn{margin-left:auto;align-self:center;}
+      .dashboard-wrap .kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;}
+      .dashboard-wrap .kpi-chip{background:#fff;border:1px solid #E4DCC9;border-left:3px solid #C79A3E;border-radius:6px;padding:14px 16px;}
+      .dashboard-wrap .kpi-chip-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#3C4E6E;font-weight:600;margin-bottom:6px;}
+      .dashboard-wrap .kpi-chip-value{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#1B2A45;display:block;line-height:1.15;}
+      .dashboard-wrap .kpi-chip-value.small{font-size:16px;}
       .dashboard-wrap .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;}
       .dashboard-wrap .card{background:#fff;border:1px solid #E4DCC9;border-radius:6px;padding:22px 22px 18px;position:relative;overflow:hidden;}
       .dashboard-wrap .card.wide{grid-column:span 2;}
@@ -610,6 +787,10 @@ function dashboardView() {
     <div class="dashboard-wrap">
       <div class="wrap">
         <header class="top">
+          <div>
+            <p class="eyebrow">IASD Canaã · Pemba</p>
+            <h1>Visão Geral</h1>
+          </div>
           <div class="top-meta">
             ${quarter}º Trimestre ${state.ui.reportYear} · <strong>Semana ${week} de 13</strong><br>
             Atualizado em ${escapeHTML(updateLabel)}
@@ -639,6 +820,25 @@ function dashboardView() {
                 .map((item) => `<option value="${item.value}" ${state.ui.reportYear === item.value ? "selected" : ""}>${item.label}</option>`)
                 .join("")}
             </select>
+          </div>
+          <button class="btn warn" type="button" data-action="print-dashboard">${icon("print")} Exportar PDF</button>
+        </div>
+        <div class="kpi-strip">
+          <div class="kpi-chip">
+            <span class="kpi-chip-label">Membros ativos</span>
+            <span class="kpi-chip-value">${summary.members}</span>
+          </div>
+          <div class="kpi-chip">
+            <span class="kpi-chip-label">Visitas no trimestre</span>
+            <span class="kpi-chip-value">${totalVisits}</span>
+          </div>
+          <div class="kpi-chip">
+            <span class="kpi-chip-label">Batismos no trimestre</span>
+            <span class="kpi-chip-value">${totalBaptized}</span>
+          </div>
+          <div class="kpi-chip">
+            <span class="kpi-chip-label">Classe em destaque</span>
+            <span class="kpi-chip-value small">${escapeHTML(topClassName)}</span>
           </div>
         </div>
         <div class="grid">
@@ -749,7 +949,7 @@ function dashboardView() {
           </div>
         </div>
 
-        <p class="signature">"Onde estiverem dois ou três reunidos em meu nome, aí estou eu no meio deles."</p>
+        <p class="signature">"Coração e Alma da Igreja! Centro de ação eu irei…!"</p>
       </div>
     </div>
   `;
@@ -1849,11 +2049,78 @@ function buildReport(type, period, classId) {
   };
 }
 
-function targetLabel(target, classId) {
-  if (target === "all") return "Todos os membros";
-  if (target === "secretary") return "Secretário / Director";
-  if (target === "direct") return "Mensagem directa";
-  return className(classId);
+function targetLabel(messageOrTarget, fallback = null) {
+  const message =
+    messageOrTarget && typeof messageOrTarget === "object"
+      ? messageOrTarget
+      : { target: messageOrTarget, recipientName: fallback };
+  if (message.target === "all") return "Todos os membros";
+  if (message.target === "secretary") return "Direcção";
+  if (message.target === "member") {
+    if (message.recipientName) return `Membro · ${message.recipientName}`;
+    if (message.recipientMemberId) {
+      const member = state.members.find((item) => item.id === message.recipientMemberId);
+      if (member) return `Membro · ${member.name}`;
+    }
+    return "Membro específico";
+  }
+  return "Mensagem";
+}
+
+function replyTargetForMessage(message) {
+  const user = currentUser();
+  if (!user || !message) return null;
+  if (message.fromRole === "member") {
+    const recipientMember = state.members.find((member) => member.name === message.from) || null;
+    return {
+      target: "member",
+      recipientMemberId: recipientMember?.id || null,
+      recipientName: message.from,
+    };
+  }
+  if (message.fromRole === "secretary") {
+    return {
+      target: "secretary",
+      recipientMemberId: null,
+      recipientName: null,
+    };
+  }
+  if (message.target === "all") {
+    return {
+      target: "secretary",
+      recipientMemberId: null,
+      recipientName: null,
+    };
+  }
+  return null;
+}
+
+function fillMessageReply(message) {
+  const form = document.getElementById("messageForm");
+  if (!form || !message) return;
+  const reply = replyTargetForMessage(message);
+  if (!reply) return;
+
+  const targetSelect = form.querySelector("#messageTarget");
+  const recipientSelect = form.querySelector("#messageRecipientId");
+  const subjectInput = form.querySelector("#messageSubject");
+  const bodyInput = form.querySelector("#messageBody");
+
+  if (targetSelect) {
+    targetSelect.value = reply.target;
+    targetSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  if (recipientSelect) {
+    recipientSelect.value = reply.recipientMemberId || "";
+  }
+  if (subjectInput) {
+    const currentSubject = String(message.subject || "").trim();
+    subjectInput.value = currentSubject.toLowerCase().startsWith("re:")
+      ? currentSubject
+      : `Re: ${currentSubject || "Mensagem"}`;
+  }
+  if (bodyInput) bodyInput.focus();
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function render() {
@@ -2026,6 +2293,10 @@ function wireEvents() {
     button.addEventListener("click", printReport);
   });
 
+  document.querySelectorAll("[data-action='print-dashboard']").forEach((button) => {
+    button.addEventListener("click", printDashboard);
+  });
+
   const reportQuarterSelect = document.querySelector("[data-action='report-quarter']");
   if (reportQuarterSelect) {
     reportQuarterSelect.addEventListener("change", (event) => {
@@ -2074,9 +2345,24 @@ function wireEvents() {
   const messageForm = document.getElementById("messageForm");
   if (messageForm) messageForm.addEventListener("submit", handleMessageSubmit);
 
+  const messageTargetSelect = document.querySelector("[data-action='message-target-toggle']");
+  const messageRecipientWrap = document.getElementById("messageRecipientWrap");
+  const syncMessageRecipientVisibility = () => {
+    if (!messageTargetSelect || !messageRecipientWrap) return;
+    const showRecipient = messageTargetSelect.value === "member";
+    messageRecipientWrap.classList.toggle("hidden", !showRecipient);
+    const recipientSelect = document.getElementById("messageRecipientId");
+    if (recipientSelect) recipientSelect.disabled = !showRecipient;
+  };
+  if (messageTargetSelect) {
+    messageTargetSelect.addEventListener("change", syncMessageRecipientVisibility);
+    syncMessageRecipientVisibility();
+  }
+
   document.querySelectorAll("[data-action='message-mode']").forEach((button) => {
     button.addEventListener("click", () => {
       state.ui.messageMode = button.dataset.mode;
+      state.ui.messageConversationKey = null;
       persist();
       render();
     });
@@ -2164,6 +2450,17 @@ async function resetAccountPassword(accountId, name) {
   }
 }
 
+// Remove acentos e caracteres não alfanuméricos, para que o nome de
+// utilizador gerado automaticamente (a partir do primeiro nome) seja
+// sempre fácil de digitar, mesmo em teclados sem acentos.
+function normalizeUsername(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
 async function handleMemberSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -2186,7 +2483,7 @@ async function handleMemberSubmit(event) {
     // servidor; nunca circula em claro no lado do cliente. Se já existir
     // alguém com o mesmo primeiro nome, acrescenta-se um número (ex:
     // "joao2") para que o utilizador seja sempre único.
-    const baseUsername = payload.name.split(" ")[0].toLowerCase();
+    const baseUsername = normalizeUsername(payload.name.split(" ")[0]) || "membro";
     let attemptUsername = baseUsername;
     let attempt = 1;
     let created = false;
@@ -2381,15 +2678,21 @@ async function handleMessageSubmit(event) {
   const form = event.currentTarget;
   const member = currentMember();
   const target = form.querySelector("#messageTarget").value;
-  const classId = form.querySelector("#messageClassId").value || null;
+  const recipientMemberId = form.querySelector("#messageRecipientId").value || null;
+  const recipientMember = recipientMemberId ? state.members.find((item) => item.id === recipientMemberId) || null : null;
   const subject = form.querySelector("#messageSubject").value.trim();
   const body = form.querySelector("#messageBody").value.trim();
+  if (target === "member" && !recipientMemberId) {
+    alert("Escolha um membro específico para enviar esta mensagem.");
+    return;
+  }
   try {
     const data = await apiFetch("/api/messages", {
       method: "POST",
       body: JSON.stringify({
         target,
-        classId: isSecretary() ? classId : member?.classId || classId,
+        recipientMemberId,
+        recipientName: recipientMember?.name || null,
         subject,
         body,
       }),
@@ -2524,6 +2827,97 @@ function printReport() {
                 })
                 .join("")
             : `<div style="color:#58706b">Sem dados para este período.</div>`}
+        </div>
+
+        <script>window.onload=()=>{window.print();}</script>
+      </body>
+    </html>
+  `;
+  const win = window.open("", "_blank", "width=900,height=700");
+  if (!win) {
+    alert("O navegador bloqueou a janela de impressão.");
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
+function printDashboard() {
+  const summary = buildDashboard();
+  const year = state.ui.reportYear;
+  const quarter = state.ui.reportQuarter;
+  const periodLabel = `${quarter}º Trimestre ${year}`;
+  const quarterData = summary.quarterData;
+  const totalVisits = quarterData.reduce((sum, item) => sum + item.visits, 0);
+  const totalBaptized = quarterData.reduce((sum, item) => sum + item.baptized, 0);
+  const requestTotals = getQuarterlyRequestTotalsByClass(state.ui.requestQuarter);
+  const ranking = rankingRows("quarter", year, quarter);
+
+  const html = `
+    <html>
+      <head>
+        <title>Visão Geral - ${periodLabel}</title>
+        <style>
+          body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#1B2A45}
+          h1,h2{margin:24px 0 12px;font-size:1.4rem;font-family:Georgia,serif}
+          h1{border-bottom:2px solid #1B2A45;padding-bottom:8px}
+          .meta{color:#3C4E6E;font-size:0.9rem;margin-top:-8px}
+          .section{margin-bottom:32px}
+          .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:12px}
+          .metric{border:1px solid #E4DCC9;border-left:3px solid #C79A3E;border-radius:6px;padding:12px}
+          .metric-label{font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:#3C4E6E;font-weight:600}
+          .metric-value{font-size:1.6rem;font-weight:700;color:#1B2A45;margin:8px 0 0}
+          table{width:100%;border-collapse:collapse;margin-top:12px}
+          th{text-align:left;font-size:0.8rem;text-transform:uppercase;color:#3C4E6E;padding:8px 8px;border-bottom:2px solid #E4DCC9}
+          td{padding:8px;border-bottom:1px solid #E4DCC9}
+          td:first-child{font-weight:600}
+        </style>
+      </head>
+      <body>
+        <h1>Visão Geral - ${periodLabel}</h1>
+        <div class="meta">Semana ${state.ui.reportWeek} de 13 · Gerado em ${escapeHTML(weeklyReportLabel(getWeeklyReportDate()))}</div>
+
+        <div class="section">
+          <h2>Resumo do trimestre</h2>
+          <div class="metrics">
+            <div class="metric">
+              <div class="metric-label">Membros ativos</div>
+              <div class="metric-value">${summary.members}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Frequência média</div>
+              <div class="metric-value">${summary.attendance}%</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Visitas no trimestre</div>
+              <div class="metric-value">${totalVisits}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Batismos no trimestre</div>
+              <div class="metric-value">${totalBaptized}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Classe em destaque</h2>
+          <table>
+            <tr><th>Classe</th><th>Pontuação</th></tr>
+            ${ranking
+              .map((row) => `<tr><td>${escapeHTML(row.name)}</td><td>${row.weighted}</td></tr>`)
+              .join("")}
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>Trimensários por classe</h2>
+          <table>
+            <tr><th>Classe</th><th>Requisitados</th><th>Distribuídos</th></tr>
+            ${requestTotals
+              .map((item) => `<tr><td>${escapeHTML(item.className)}</td><td>${item.requested}</td><td>${item.distributed}</td></tr>`)
+              .join("")}
+          </table>
         </div>
 
         <script>window.onload=()=>{window.print();}</script>
@@ -2755,7 +3149,7 @@ function recentActivityItems() {
       kind: "Mensagem",
       date: message.createdAt,
       title: message.subject,
-      meta: `${message.from} · ${targetLabel(message.target, message.classId)}`,
+      meta: `${message.from} · ${targetLabel(message)}`,
     })),
   ];
 
@@ -3122,40 +3516,48 @@ function accountView() {
 function messagesView() {
   const secretary = isSecretary();
   const messages = visibleMessages();
+  const conversations = buildConversationSummaries(messages, true);
+  const selectedKey = activeConversationKey(conversations);
+  const selectedConversation = conversations.find((item) => item.key === selectedKey) || conversations[0] || null;
+  const unreadConversations = buildConversationSummaries(messages, false).filter((item) => item.unreadCount > 0).length;
   return `
     <section class="grid two">
       <div class="panel">
         <div class="section-header">
           <div>
-            <h2>${secretary ? "Enviar comunicado" : "Enviar mensagem"}</h2>
+            <h2>${secretary ? "Chat da direcção" : "Chat de mensagens"}</h2>
+            <p class="muted">Envie para todos, para a direcção ou para um membro específico.</p>
             </div>
         </div>
         <form id="messageForm" class="form-grid">
-          <div class="form-grid three">
+          <div class="form-grid two">
             <div class="field">
               <label for="messageTarget">Destino</label>
-              <select id="messageTarget" name="target">
-                ${secretary ? `
-                  <option value="all">Todos os membros</option>
-                  ${state.classes.map((klass) => `<option value="${klass.id}">${escapeHTML(klass.name)}</option>`).join("")}
-                ` : `<option value="secretary">Secretario / Director</option>`}
+              <select id="messageTarget" name="target" data-action="message-target-toggle">
+                <option value="all">Todos</option>
+                <option value="secretary">Direcção</option>
+                <option value="member">Membro específico</option>
               </select>
             </div>
-            <div class="field">
-              <label for="messageSubject">Assunto</label>
-              <input id="messageSubject" name="subject" required />
-            </div>
-            <div class="field">
-              <label for="messageClassId">Classe</label>
-              <select id="messageClassId" name="classId">
-                <option value="">Sem classe</option>
-                ${state.classes.map((klass) => `<option value="${klass.id}">${escapeHTML(klass.name)}</option>`).join("")}
+            <div class="field hidden" id="messageRecipientWrap">
+              <label for="messageRecipientId">Destinatário específico</label>
+              <select id="messageRecipientId" name="recipientMemberId">
+                <option value="">Escolher membro</option>
+                ${state.members
+                  .filter((member) => member.active)
+                  .filter((member) => member.id !== (currentUser()?.memberId || null))
+                  .map((member) => `<option value="${member.id}">${escapeHTML(member.name)} · ${escapeHTML(className(member.classId))}</option>`)
+                  .join("")}
               </select>
             </div>
           </div>
           <div class="field">
+            <label for="messageSubject">Assunto</label>
+            <input id="messageSubject" name="subject" required placeholder="Ex: aviso, reunião, pedido..." />
+          </div>
+          <div class="field">
             <label for="messageBody">Mensagem</label>
-            <textarea id="messageBody" name="body" required></textarea>
+            <textarea id="messageBody" name="body" required placeholder="Escreva a sua mensagem..."></textarea>
           </div>
           <button class="btn primary" type="submit">${icon("messages")} Enviar</button>
         </form>
@@ -3163,29 +3565,48 @@ function messagesView() {
       <div class="panel">
         <div class="section-header">
           <div>
-            <h2>Caixa de mensagens</h2>
+            <h2>Conversas</h2>
+            <p class="muted">${unreadConversations} conversas com novidades</p>
             </div>
         </div>
         <div class="toolbar">
           <button class="btn ${state.ui.messageMode === "inbox" ? "primary" : ""}" type="button" data-action="message-mode" data-mode="inbox">Entrada</button>
-          <button class="btn ${state.ui.messageMode === "outbox" ? "primary" : ""}" type="button" data-action="message-mode" data-mode="outbox">Saida</button>
+          <button class="btn ${state.ui.messageMode === "outbox" ? "primary" : ""}" type="button" data-action="message-mode" data-mode="outbox">Saída</button>
           <button class="btn ${state.ui.messageMode === "all" ? "primary" : ""}" type="button" data-action="message-mode" data-mode="all">Todos</button>
         </div>
-        <div class="list">
-          ${messageList(messages, secretary)}
+        <div class="conversation-grid">
+          <div class="conversation-list">
+            ${messageConversationList(conversations, selectedConversation?.key || null)}
+          </div>
+          <div class="conversation-thread">
+            ${
+              selectedConversation
+                ? `
+              <div class="conversation-thread-head">
+                <div>
+                  <h3>${escapeHTML(selectedConversation.title)}</h3>
+                  <p class="muted">${selectedConversation.messages.length} mensagens nesta conversa</p>
+                </div>
+              </div>
+              ${messageListChat(selectedConversation.messages)}
+            `
+                : `<div class="muted-box">Nenhuma conversa disponível.</div>`
+            }
+          </div>
         </div>
       </div>
     </section>
   `;
 }
 
-function messageList(messages, secretary) {
-  let rows = messages;
+function messageList(messages) {
+  const user = currentUser();
+  let rows = messages.slice().sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
   if (state.ui.messageMode === "inbox") {
-    rows = messages.filter((msg) => msg.fromRole !== "secretary" || !secretary);
+    rows = rows.filter((msg) => msg.from !== user?.name);
   }
   if (state.ui.messageMode === "outbox") {
-    rows = messages.filter((msg) => msg.fromRole === "secretary");
+    rows = rows.filter((msg) => msg.from === user?.name);
   }
   return rows
     .slice()
@@ -3200,12 +3621,72 @@ function messageList(messages, secretary) {
             ${canModifyMessage(message) ? `<button type="button" class="btn danger" data-action="remove-message" data-id="${message.id}">Remover</button>` : ""}
           </div>
         </div>
-        <div class="note">${formatDate(message.createdAt)} · ${escapeHTML(targetLabel(message.target, message.classId))}</div>
+        <div class="note">${formatDate(message.createdAt)} · ${escapeHTML(targetLabel(message))}</div>
         <div style="margin-top:8px">${escapeHTML(message.body)}</div>
       </div>
     `
     )
     .join("") || `<div class="muted-box">Sem mensagens para esta vista.</div>`;
+}
+
+function messageListChat(messages) {
+  const user = currentUser();
+  let rows = messages.slice().sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  return rows
+    .map((message) => {
+      const outgoing = message.from === user?.name;
+      const recipient = targetLabel(message);
+      return `
+      <div class="chat-item ${outgoing ? "outgoing" : "incoming"}">
+        <div class="chat-meta">
+          <strong>${escapeHTML(message.from)}</strong>
+          <span>${escapeHTML(recipient)}</span>
+        </div>
+        <div class="chat-bubble">
+          <div class="chat-subject">${escapeHTML(message.subject)}</div>
+          <div class="chat-body">${escapeHTML(message.body)}</div>
+          <div class="chat-footer">
+            <span>${formatDate(message.createdAt)}</span>
+            ${!outgoing ? `<button type="button" class="btn" data-action="reply-message" data-id="${message.id}">Responder</button>` : ""}
+            ${canModifyMessage(message) ? `<button type="button" class="btn danger" data-action="remove-message" data-id="${message.id}">Remover</button>` : ""}
+          </div>
+        </div>
+      </div>
+    `;
+    })
+    .join("") || `<div class="muted-box">Sem mensagens para esta vista.</div>`;
+}
+
+function messageConversationList(conversations, selectedKey) {
+  const user = currentUser();
+  return conversations
+    .map((conversation) => {
+      const latest = conversation.latest;
+      const preview = latest ? `${latest.from}: ${latest.body}`.slice(0, 90) : "";
+      return `
+        <button type="button" class="conversation-item ${conversation.key === selectedKey ? "active" : ""}" data-action="message-conversation" data-id="${conversation.key}">
+          <div class="conversation-item-top">
+            <strong>${escapeHTML(conversation.title)}</strong>
+            ${conversation.unreadCount ? `<span class="conversation-badge">${conversation.unreadCount}</span>` : ""}
+          </div>
+          <div class="conversation-preview">${escapeHTML(preview || "Sem pré-visualização")}</div>
+          <div class="conversation-meta">
+            <span>${latest ? formatDate(latest.createdAt) : ""}</span>
+            <span>${conversation.messages.length} mensagens</span>
+          </div>
+        </button>
+      `;
+    })
+    .join("") || `<div class="muted-box">Sem conversas para esta vista.</div>`;
+}
+
+function messageRecipientOptions() {
+  const user = currentUser();
+  const currentMemberId = user?.memberId || null;
+  return state.members
+    .filter((member) => member.active)
+    .filter((member) => member.id !== currentMemberId)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function memberReportsView() {
@@ -3384,9 +3865,27 @@ function readOnlyRankingView(rows, top) {
 
 if (!globalThis.__iasdCleanupBound) {
   document.addEventListener("click", (event) => {
-    const button = event.target.closest?.("[data-action^='remove-']");
+    const button = event.target.closest?.("[data-action]");
     if (!button) return;
     const id = button.dataset.id;
+    if (button.dataset.action === "reply-message") {
+      const message = state.messages.find((item) => item.id === id);
+      if (!message) return;
+      state.ui.view = "messages";
+      state.ui.messageConversationKey = conversationKeyForMessage(message);
+      persist();
+      render();
+      requestAnimationFrame(() => fillMessageReply(message));
+      return;
+    }
+    if (button.dataset.action === "message-conversation") {
+      state.ui.messageConversationKey = id;
+      persist();
+      markConversationAsSeen(id);
+      render();
+      return;
+    }
+    if (!button.dataset.action.startsWith("remove-")) return;
     if (button.dataset.action === "remove-member") removeRecord("member", id);
     if (button.dataset.action === "remove-lesson") removeRecord("lesson", id);
     if (button.dataset.action === "remove-request") removeRecord("request", id);

@@ -405,20 +405,20 @@ async function handleApi(req, res, urlPath) {
   if (req.method === "POST" && urlPath === "/api/messages") {
     const body = await readJSONBody(req);
     const data = getAppData();
+    const target = body.target || "all";
+    const recipientMemberId = body.recipientMemberId || null;
+    const recipientMember = recipientMemberId ? data.members.find((m) => m.id === recipientMemberId) || null : null;
+    if (target === "member" && !recipientMember) {
+      return sendJSON(res, 400, { error: "Escolha um membro específico para receber a mensagem." });
+    }
     const message = {
       id: `msg_${crypto.randomBytes(6).toString("hex")}`,
-      createdAt: todayISO(),
+      createdAt: new Date().toISOString(),
       from: user.name,
       fromRole: user.role,
-      target: body.target || "all",
-      classId:
-        user.role === "secretary"
-          ? body.target === "all"
-            ? null
-            : body.target
-          : user.member_id
-          ? data.members.find((m) => m.id === user.member_id)?.classId ?? null
-          : null,
+      target,
+      recipientMemberId: target === "member" ? recipientMemberId : null,
+      recipientName: target === "member" ? recipientMember?.name || null : null,
       subject: String(body.subject || "").trim(),
       body: String(body.body || "").trim(),
       read: false,
