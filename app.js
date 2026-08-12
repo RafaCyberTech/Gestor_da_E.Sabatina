@@ -727,258 +727,115 @@ function readOnlyPanel(message) {
 function dashboardView() {
   const secretary = isSecretary();
   const summary = buildDashboard();
-  const quarter = state.ui.reportQuarter;
-  const week = state.ui.reportWeek;
-  const updateLabel = weeklyReportLabel(getWeeklyReportDate());
-  const requestSummary = requestBreakdown();
-  const quarterKey = getQuarterKey(state.ui.reportYear, state.ui.reportQuarter);
-  const quarterReports = reportsForQuarter(state.ui.reportYear, state.ui.reportQuarter);
-  const latestQuarterReport = quarterReports.slice().reverse().find((report) => reportTotals(report).enrolled > 0);
-  const latestQuarterTotals = latestQuarterReport ? reportTotals(latestQuarterReport) : { enrolled: 0 };
-  const totalVisits = summary.quarterData.reduce((sum, item) => sum + item.visits, 0);
-  const totalBaptized = summary.quarterData.reduce((sum, item) => sum + item.baptized, 0);
-  const requestedLessons = requestedLessonsForQuarter(state.ui.reportYear, state.ui.reportQuarter);
-  const offerings = summary.averageOffering;
-  const prevQuarter = state.ui.reportQuarter === 1 ? 4 : state.ui.reportQuarter - 1;
-  const prevYear = state.ui.reportQuarter === 1 ? state.ui.reportYear - 1 : state.ui.reportYear;
-  const prevQuarterData = getDashboardQuarterReportData(prevYear, prevQuarter);
-  const prevAvgOffering = prevQuarterData.length ? Math.round(prevQuarterData.reduce((sum, item) => sum + item.offering, 0) / prevQuarterData.length) : 0;
-  const offerDelta = offerings >= prevAvgOffering ? 'up' : 'down';
-  const offerDiff = prevAvgOffering > 0 ? Math.round(((offerings - prevAvgOffering) / prevAvgOffering) * 100) : null;
-  const memberActivity = summary.averageEnrolled;
-  const prevMemberActivity = prevQuarterData.length ? Math.round(prevQuarterData.reduce((sum, item) => sum + item.enrolled, 0) / prevQuarterData.length) : 0;
-  const memberDelta = prevMemberActivity > 0 ? Math.round(((memberActivity - prevMemberActivity) / prevMemberActivity) * 100) : null;
-  const memberDeltaClass = memberDelta === null ? 'up' : memberDelta >= 0 ? 'up' : 'down';
-  const memberDeltaLabel = memberDelta === null ? '—' : `${memberDelta >= 0 ? '+' : ''}${memberDelta}% vs T${prevQuarter} ${prevYear}`;
-  const prevLabel = `T${prevQuarter} ${prevYear}`;
-  const yearOptions = getDashboardYearOptions();
-  const topClass = rankingRows("quarter", state.ui.reportYear, state.ui.reportQuarter)[0];
-  const topClassName = topClass ? topClass.name : "—";
+  const currentWeek = reportWeekForDate(todayISO());
+  const lastReportWithData = state.weeklyReports
+    .filter((item) => reportQuarterForDate(item.date) === getQuarterKey(summary.year, summary.quarter) && reportTotals(item).enrolled > 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .pop();
+  const updateLabel = lastReportWithData ? weeklyReportLabel(lastReportWithData.date) : "ainda sem registos";
+  const activePct = summary.members ? Math.round((summary.averageActive / summary.members) * 100) : 0;
 
   return `
     <style>
       .dashboard-wrap{
-        --night:#141a30; --card:#1c2440; --card-line:#333e64;
-        --dawn:#e8a33d; --dawn-soft:#f0c184; --dusk:#c96a6a; --good:#7fb99a;
-        --dtext:#f1eee3; --dmuted:#9aa5c9; --dmuted-2:#6b7699;
-        font-family:'Source Sans 3',sans-serif;color:var(--dtext);
-        background:var(--night);border-radius:18px;padding:28px 26px 34px;
+        font-family:inherit;color:var(--text);
+        background:var(--bg);border-radius:var(--radius);padding:28px 26px 34px;
         margin:-4px -4px 0;
       }
-      .dashboard-wrap .wrap{max-width:1180px;margin:0 auto;}
-      .dashboard-wrap .horizon{height:3px;width:100%;border-radius:3px;margin-bottom:24px;
-        background:linear-gradient(90deg, var(--night) 0%, var(--dusk) 35%, var(--dawn) 65%, var(--night) 100%);}
-      .dashboard-wrap header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:24px;}
-      .dashboard-wrap .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dawn-soft);font-weight:600;margin-bottom:6px;}
-      .dashboard-wrap h1{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:32px;margin:0;line-height:1.1;color:var(--dtext);}
-      .dashboard-wrap .top-meta{text-align:right;font-size:13px;color:var(--dmuted);line-height:1.5;margin-left:auto;}
-      .dashboard-wrap .top-meta strong{color:var(--dawn-soft);}
-      .dashboard-wrap .filters{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:20px;}
-      .dashboard-wrap .filters .field{min-width:150px;}
-      .dashboard-wrap .filters label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--dmuted);margin-bottom:6px;}
-      .dashboard-wrap .filters select{width:100%;padding:10px 12px;border:1px solid var(--card-line);border-radius:8px;background:var(--card);color:var(--dtext);font-size:14px;}
-      .dashboard-wrap .kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;}
-      .dashboard-wrap .kpi-chip{background:var(--card);border:1px solid var(--card-line);border-top:2px solid var(--dawn);border-radius:10px;padding:16px 18px;}
-      .dashboard-wrap .kpi-chip-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dmuted);font-weight:600;margin-bottom:8px;}
-      .dashboard-wrap .kpi-chip-value{font-family:'Fraunces',Georgia,serif;font-size:24px;font-weight:700;color:var(--dtext);display:block;line-height:1.15;}
-      .dashboard-wrap .kpi-chip-value.small{font-size:17px;}
-      .dashboard-wrap .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
-      .dashboard-wrap .card{background:var(--card);border:1px solid var(--card-line);border-radius:10px;padding:22px 22px 18px;position:relative;overflow:hidden;}
-      .dashboard-wrap .card.wide{grid-column:span 2;}
-      .dashboard-wrap .card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
-      .dashboard-wrap .card-title{font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:600;margin:0 0 3px;color:var(--dtext);}
-      .dashboard-wrap .card-sub{font-size:12.5px;color:var(--dmuted);}
-      .dashboard-wrap .kpi{text-align:right;}
-      .dashboard-wrap .kpi .num{font-family:'Fraunces',Georgia,serif;font-size:24px;font-weight:700;display:block;line-height:1;color:var(--dtext);}
-      .dashboard-wrap .kpi .delta{font-size:12px;font-weight:600;display:inline-block;margin-top:5px;padding:2px 8px;border-radius:20px;}
-      .dashboard-wrap .delta.up{background:rgba(127,185,154,0.16);color:var(--good);}
-      .dashboard-wrap .delta.down{background:rgba(201,106,106,0.16);color:var(--dusk);}
-      .dashboard-wrap .chart-box{position:relative;height:190px;}
-      .dashboard-wrap .chart-box.short{height:150px;}
-      .dashboard-wrap .legend-row{display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--dmuted);flex-wrap:wrap;}
-      .dashboard-wrap .legend-row span{display:flex;align-items:center;gap:6px;}
-      .dashboard-wrap .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
-      .dashboard-wrap .foot-note{margin-top:8px;font-size:12px;color:var(--dmuted);border-top:1px dashed var(--card-line);padding-top:10px;}
-      .dashboard-wrap .class-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
-      .dashboard-wrap .class-table th{text-align:left;font-weight:600;color:var(--dmuted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-bottom:8px;border-bottom:1px solid var(--card-line);}
-      .dashboard-wrap .class-table td{padding:9px 0;border-bottom:1px solid var(--card-line);color:var(--dtext);}
-      .dashboard-wrap .class-table tr:last-child td{border-bottom:none;}
-      .dashboard-wrap .dash-actions{display:flex;justify-content:flex-end;margin-top:24px;padding-top:20px;border-top:1px solid var(--card-line);}
-      .dashboard-wrap .signature{font-family:'Fraunces',Georgia,serif;font-style:italic;color:var(--dmuted);text-align:center;font-size:13px;margin-top:22px;}
-      @media (max-width:760px){.dashboard-wrap .card.wide{grid-column:span 1;} .dashboard-wrap{padding:20px 16px 26px;}}
+      .dashboard-wrap .d-inner{max-width:1180px;margin:0 auto;}
+      .dashboard-wrap .d-horizon{height:3px;width:100%;border-radius:3px;margin-bottom:24px;
+        background:linear-gradient(90deg, var(--green-deep) 0%, var(--gold) 50%, var(--green-deep) 100%);}
+      .dashboard-wrap header.d-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:24px;}
+      .dashboard-wrap .d-eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:6px;}
+      .dashboard-wrap h1{font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:32px;margin:0;line-height:1.1;color:var(--green-deep);}
+      .dashboard-wrap .d-meta{text-align:right;font-size:13px;color:var(--muted);line-height:1.5;margin-left:auto;}
+      .dashboard-wrap .d-meta strong{color:var(--green-mid);}
+      .dashboard-wrap .d-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
+      .dashboard-wrap .d-stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-sm);padding:18px 20px;position:relative;overflow:hidden;box-shadow:var(--shadow-sm);}
+      .dashboard-wrap .d-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--stat-accent, var(--gold));}
+      .dashboard-wrap .d-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;font-weight:600;}
+      .dashboard-wrap .d-value{font-family:Georgia,serif;font-size:32px;font-weight:700;color:var(--text);display:flex;align-items:baseline;gap:6px;}
+      .dashboard-wrap .d-value-sub{font-size:15px;color:var(--muted);font-weight:400;}
+      .dashboard-wrap .d-delta{font-size:12px;color:var(--success);margin-top:6px;font-weight:600;}
+      .dashboard-wrap .d-delta.flat{color:var(--muted);font-weight:400;}
+      .dashboard-wrap .d-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+      .dashboard-wrap .d-panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-sm);padding:20px 20px 12px;box-shadow:var(--shadow-sm);}
+      .dashboard-wrap .d-panel h2{font-family:Georgia,serif;font-size:17px;font-weight:700;margin:0 0 2px;color:var(--green-deep);}
+      .dashboard-wrap .d-desc{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
+      .dashboard-wrap .d-chart{position:relative;height:190px;}
+      .dashboard-wrap .d-actions{display:flex;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--line);}
+      .dashboard-wrap .d-signature{font-family:Georgia,serif;font-style:italic;color:var(--muted);text-align:center;font-size:13px;margin-top:22px;}
+      @media (max-width:760px){.dashboard-wrap .d-stats{grid-template-columns:1fr 1fr;} .dashboard-wrap .d-grid2{grid-template-columns:1fr;} .dashboard-wrap header.d-top{flex-direction:column;align-items:flex-start;} .dashboard-wrap .d-meta{text-align:left;} .dashboard-wrap{padding:20px 16px 26px;}}
     </style>
     <div class="dashboard-wrap">
-      <div class="wrap">
-        <div class="horizon"></div>
-        <header class="top">
+      <div class="d-inner">
+        <div class="d-horizon"></div>
+        <header class="d-top">
           <div>
-            <p class="eyebrow">IASD Canaã · Pemba</p>
+            <p class="d-eyebrow">IASD Canaã · Pemba</p>
             <h1>Visão Geral</h1>
           </div>
-          <div class="top-meta">
-            ${quarter}º Trimestre ${state.ui.reportYear} · <strong>Semana ${week} de 13</strong><br>
+          <div class="d-meta">
+            ${summary.quarter}º Trimestre ${summary.year} · <strong>Semana ${currentWeek} de 13</strong><br>
             Atualizado em ${escapeHTML(updateLabel)}
           </div>
         </header>
-        <div class="filters">
-          <div class="field">
-            <label for="dashboardQuarter">Trimestre</label>
-            <select id="dashboardQuarter" data-action="report-quarter">
-              ${[1, 2, 3, 4]
-                .map((value) => `<option value="${value}" ${state.ui.reportQuarter === value ? "selected" : ""}>${value}</option>`)
-                .join("")}
-            </select>
+
+        <div class="d-stats">
+          <div class="d-stat" style="--stat-accent:var(--gold)">
+            <div class="d-label">Membros Matriculados</div>
+            <div class="d-value">${summary.members}</div>
           </div>
-          <div class="field">
-            <label for="dashboardWeek">Sábado</label>
-            <select id="dashboardWeek" data-action="report-week">
-              ${Array.from({ length: 13 }, (_, index) => index + 1)
-                .map((value) => `<option value="${value}" ${state.ui.reportWeek === value ? "selected" : ""}>${value}</option>`)
-                .join("")}
-            </select>
+          <div class="d-stat" style="--stat-accent:var(--danger)">
+            <div class="d-label">Ativos nas Actividades</div>
+            <div class="d-value">${summary.averageActive}<span class="d-value-sub">/${summary.members}</span></div>
+            <div class="d-delta">${activePct}% de participação</div>
           </div>
-          <div class="field">
-            <label for="dashboardYear">Ano</label>
-            <select id="dashboardYear" data-action="report-year">
-              ${yearOptions
-                .map((item) => `<option value="${item.value}" ${state.ui.reportYear === item.value ? "selected" : ""}>${item.label}</option>`)
-                .join("")}
-            </select>
+          <div class="d-stat" style="--stat-accent:var(--success)">
+            <div class="d-label">Estudo da Lição</div>
+            <div class="d-value">${summary.lessonPct}%</div>
+            <div class="d-delta flat">média das últimas semanas</div>
+          </div>
+          <div class="d-stat" style="--stat-accent:var(--gold-line)">
+            <div class="d-label">Alunos Baptizados</div>
+            <div class="d-value">${summary.totalBaptized}</div>
+            <div class="d-delta">neste trimestre</div>
           </div>
         </div>
-        <div class="kpi-strip">
-          <div class="kpi-chip">
-            <span class="kpi-chip-label">Membros ativos</span>
-            <span class="kpi-chip-value">${summary.members}</span>
+
+        <div class="d-grid2">
+          <div class="d-panel">
+            <h2>Crescimento de Membros</h2>
+            <div class="d-desc">Matriculados por sábado</div>
+            <div class="d-chart"><canvas id="chartMembros"></canvas></div>
           </div>
-          <div class="kpi-chip">
-            <span class="kpi-chip-label">Visitas no trimestre</span>
-            <span class="kpi-chip-value">${totalVisits}</span>
-          </div>
-          <div class="kpi-chip">
-            <span class="kpi-chip-label">Batismos no trimestre</span>
-            <span class="kpi-chip-value">${totalBaptized}</span>
-          </div>
-          <div class="kpi-chip">
-            <span class="kpi-chip-label">Classe em destaque</span>
-            <span class="kpi-chip-value small">${escapeHTML(topClassName)}</span>
+          <div class="d-panel">
+            <h2>Frequência &amp; Participação</h2>
+            <div class="d-desc">Presença geral por sábado</div>
+            <div class="d-chart"><canvas id="chartFrequencia"></canvas></div>
           </div>
         </div>
-        <div class="grid">
-          <div class="card wide">
-            <div class="card-head">
-              <div>
-                <p class="card-title">Crescimento de Membros</p>
-                <p class="card-sub">Média de matriculados por sábado</p>
-              </div>
-              <div class="kpi">
-                <span class="num">${memberActivity}</span>
-                <span class="delta ${memberDeltaClass}">${memberDeltaLabel}</span>
-              </div>
-            </div>
-            <div class="chart-box"><canvas id="chartMembros"></canvas></div>
-            <div class="legend-row">
-              <span><i class="dot" style="background:#7fb99a"></i> Presentes</span>
-              <span><i class="dot" style="background:#e8a33d"></i> Matriculados</span>
-            </div>
-          </div>
 
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <p class="card-title">Frequência Geral</p>
-                <p class="card-sub">Média de presença por sábado</p>
-              </div>
-              <div class="kpi">
-                <span class="num">${summary.attendance}%</span>
-                <span class="delta ${summary.attendance >= 75 ? 'up' : 'down'}">${summary.attendance >= 75 ? '+' : '-'}${Math.abs(75 - summary.attendance)}% vs trim. anterior</span>
-              </div>
-            </div>
-            <div class="chart-box short"><canvas id="chartFrequencia"></canvas></div>
-            <div class="legend-row">
-              <span><i class="dot" style="background:#7fb99a"></i> ≥75%</span>
-              <span><i class="dot" style="background:#e8a33d"></i> 50–74%</span>
-              <span><i class="dot" style="background:#c96a6a"></i> &lt;50%</span>
-            </div>
+        <div class="d-grid2">
+          <div class="d-panel">
+            <h2>Estudo da Lição</h2>
+            <div class="d-desc">% de alunos que estudaram a lição, por sábado</div>
+            <div class="d-chart"><canvas id="chartLicao"></canvas></div>
           </div>
-
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <p class="card-title">Estudo da Lição</p>
-                <p class="card-sub">Média de lições estudadas por sábado</p>
-              </div>
-              <div class="kpi">
-                <span class="num">${summary.averageStudiedLesson}</span>
-                <span class="delta up">média dos 13 sábados</span>
-              </div>
-            </div>
-            <div class="chart-box short"><canvas id="chartLicao"></canvas></div>
-            <div class="legend-row">
-              <span><i class="dot" style="background:#7fb99a"></i> Lição estudada</span>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <p class="card-title">Trimensários</p>
-                <p class="card-sub">Requisitados vs distribuídos por classe</p>
-              </div>
-              <div class="kpi">
-                <span class="num">${requestSummary}</span>
-                <span class="delta down">pendentes</span>
-              </div>
-            </div>
-            <table class="class-table">
-              <tr><th>Classe</th><th>Requisitados</th><th>Distribuídos</th></tr>
-              ${getQuarterlyRequestTotalsByClass(state.ui.requestQuarter)
-                .map(
-                  (item) => `
-                    <tr>
-                      <td>${escapeHTML(item.className)}</td>
-                      <td>${item.requested}</td>
-                      <td>${item.distributed}</td>
-                    </tr>
-                  `
-                )
-                .join('')}
-            </table>
-            <p class="foot-note">${(() => {
-              const totals = getQuarterlyRequestTotalsByClass(state.ui.requestQuarter);
-              const topPending = totals.slice().sort((a, b) => b.pending - a.pending)[0];
-              return topPending && topPending.pending > 0
-                ? `${escapeHTML(topPending.className)} tem o maior número de pendências este trimestre.`
-                : 'Nenhuma pendência registada por classe neste trimestre.';
-            })()}</p>
-          </div>
-
-          <div class="card wide">
-            <div class="card-head">
-              <div>
-                <p class="card-title">Ofertas</p>
-                <p class="card-sub">Média por sábado no trimestre</p>
-              </div>
-              <div class="kpi">
-                <span class="num">${offerings.toFixed(0)} MZN</span>
-                <span class="delta ${offerDelta}">${offerDiff === null ? '—' : `${offerDelta === 'up' ? '+' : '-'}${Math.abs(offerDiff)}%`} vs ${prevLabel}</span>
-              </div>
-            </div>
-            <div class="chart-box"><canvas id="chartOfertas"></canvas></div>
-            <div class="legend-row">
-              <span><i class="dot" style="background:#e8a33d"></i> Trimestre atual</span>
-              <span><i class="dot" style="background:#5b567f"></i> Trimestre anterior</span>
-            </div>
+          <div class="d-panel">
+            <h2>Ofertas</h2>
+            <div class="d-desc">Contribuições registadas por sábado</div>
+            <div class="d-chart"><canvas id="chartOfertas"></canvas></div>
           </div>
         </div>
 
         ${secretary ? `
-        <div class="dash-actions">
+        <div class="d-actions">
           <button class="btn warn" type="button" data-action="print-dashboard">${icon("print")} Exportar PDF</button>
         </div>
         ` : ""}
 
-        <p class="signature">"Coração e Alma da Igreja! Centro de ação eu irei…!"</p>
+        <p class="d-signature">"Coração e Alma da Igreja! Centro de ação eu irei…!"</p>
       </div>
     </div>
   `;
@@ -998,25 +855,37 @@ function initializeDashboardCharts() {
   destroyChart('chartLicao');
   destroyChart('chartOfertas');
 
-  Chart.defaults.font.family = "'Source Sans 3', sans-serif";
-  Chart.defaults.color = '#9aa5c9';
+  const COLORS = {
+    green: '#0a4f32',
+    greenMid: '#0e6b44',
+    gold: '#c9891d',
+    goldLine: '#e8c97a',
+    success: '#1e7d45',
+    warning: '#a07010',
+    danger: '#b34845',
+    line: '#dce8e0',
+    muted: '#6b8576',
+  };
+
+  Chart.defaults.font.family = "'Segoe UI', 'Trebuchet MS', sans-serif";
+  Chart.defaults.color = COLORS.muted;
 
   const tooltipStyle = {
-    backgroundColor: '#0f1428',
-    titleColor: '#f1eee3',
-    titleFont: { family: "'Fraunces', serif", size: 13, weight: '600' },
-    bodyColor: '#f1eee3',
+    backgroundColor: '#ffffff',
+    titleColor: COLORS.green,
+    titleFont: { family: 'Georgia, serif', size: 13, weight: '700' },
+    bodyColor: '#1a2e22',
     bodyFont: { size: 12 },
     padding: 10,
     cornerRadius: 8,
     displayColors: false,
     caretSize: 6,
-    borderColor: '#e8a33d',
+    borderColor: COLORS.goldLine,
     borderWidth: 1,
   };
 
-  const noBorderGrid = (axis) => ({
-    grid: { color: 'rgba(255,255,255,0.08)', display: axis === 'y' },
+  const gridStyle = (axis) => ({
+    grid: { color: COLORS.line, display: axis === 'y' },
     ticks: { font: { size: 11 } },
     border: { display: false },
   });
@@ -1031,15 +900,10 @@ function initializeDashboardCharts() {
 
   const summary = buildDashboard();
   const labels = summary.quarterData.map((item) => `S${item.week}`);
-  const attendanceData = summary.quarterData.map((item) => item.attendancePct);
-  const presentData = summary.quarterData.map((item) => item.present + item.visits);
   const enrolledData = summary.quarterData.map((item) => item.enrolled);
+  const attendanceData = summary.quarterData.map((item) => item.attendancePct);
+  const lessonPctData = summary.quarterData.map((item) => (item.enrolled ? Math.round((item.studiedLesson / item.enrolled) * 100) : 0));
   const offeringData = summary.quarterData.map((item) => item.offering);
-
-  const prevQuarter = state.ui.reportQuarter === 1 ? 4 : state.ui.reportQuarter - 1;
-  const prevYear = state.ui.reportQuarter === 1 ? state.ui.reportYear - 1 : state.ui.reportYear;
-  const prevQuarterData = getDashboardQuarterReportData(prevYear, prevQuarter);
-  const prevOfferingData = prevQuarterData.map((item) => item.offering);
 
   const ctxMembros = document.getElementById('chartMembros');
   if (ctxMembros) {
@@ -1049,34 +913,19 @@ function initializeDashboardCharts() {
         labels,
         datasets: [
           {
-            label: 'Presentes',
-            data: presentData,
-            borderColor: '#7fb99a',
-            backgroundColor: makeGradient(ctxMembros, 'rgba(127,185,154,0.32)', 'rgba(127,185,154,0.02)'),
+            label: 'Matriculados',
+            data: enrolledData,
+            borderColor: COLORS.gold,
+            backgroundColor: makeGradient(ctxMembros, 'rgba(201,137,29,0.28)', 'rgba(201,137,29,0.02)'),
             borderWidth: 2.5,
             fill: true,
-            tension: 0.4,
+            tension: 0.35,
             pointRadius: 3,
             pointHoverRadius: 6,
             pointBackgroundColor: '#fff',
-            pointBorderColor: '#7fb99a',
+            pointBorderColor: COLORS.gold,
             pointBorderWidth: 2,
-            pointHoverBackgroundColor: '#7fb99a',
-          },
-          {
-            label: 'Matriculados',
-            data: enrolledData,
-            borderColor: '#e8a33d',
-            backgroundColor: 'transparent',
-            borderWidth: 2,
-            borderDash: [5, 4],
-            tension: 0.4,
-            pointRadius: 2.5,
-            pointHoverRadius: 5,
-            pointBackgroundColor: '#fff',
-            pointBorderColor: '#e8a33d',
-            pointBorderWidth: 2,
-            pointHoverBackgroundColor: '#e8a33d',
+            pointHoverBackgroundColor: COLORS.gold,
           },
         ],
       },
@@ -1086,14 +935,14 @@ function initializeDashboardCharts() {
         interaction: { mode: 'index', intersect: false },
         animation: { duration: 700, easing: 'easeOutQuart' },
         plugins: { legend: { display: false }, tooltip: tooltipStyle },
-        scales: { x: noBorderGrid('x'), y: { ...noBorderGrid('y'), beginAtZero: true } },
+        scales: { x: gridStyle('x'), y: { ...gridStyle('y'), beginAtZero: true } },
       },
     });
   }
 
   const ctxFrequencia = document.getElementById('chartFrequencia');
   if (ctxFrequencia) {
-    const barColors = attendanceData.map((value) => (value >= 75 ? '#7fb99a' : value >= 50 ? '#e8a33d' : '#c96a6a'));
+    const barColors = attendanceData.map((value) => (value >= 75 ? COLORS.success : value >= 50 ? COLORS.warning : COLORS.danger));
     new Chart(ctxFrequencia, {
       type: 'bar',
       data: {
@@ -1118,8 +967,8 @@ function initializeDashboardCharts() {
           tooltip: { ...tooltipStyle, callbacks: { label: (ctx) => `Frequência: ${ctx.parsed.y}%` } },
         },
         scales: {
-          x: noBorderGrid('x'),
-          y: { ...noBorderGrid('y'), min: 0, max: 100, ticks: { callback: (v) => `${v}%`, font: { size: 11 } } },
+          x: gridStyle('x'),
+          y: { ...gridStyle('y'), min: 0, max: 100, ticks: { callback: (v) => `${v}%`, font: { size: 11 } } },
         },
       },
     });
@@ -1127,17 +976,16 @@ function initializeDashboardCharts() {
 
   const ctxLicao = document.getElementById('chartLicao');
   if (ctxLicao) {
-    const lessonData = summary.quarterData.map((item) => item.studiedLesson);
     new Chart(ctxLicao, {
       type: 'bar',
       data: {
         labels,
         datasets: [
           {
-            label: 'Lições estudadas',
-            data: lessonData,
-            backgroundColor: makeGradient(ctxLicao, '#7fb99a', '#4f8a6c', 150),
-            hoverBackgroundColor: '#3f7359',
+            label: 'Lição estudada',
+            data: lessonPctData,
+            backgroundColor: makeGradient(ctxLicao, COLORS.greenMid, COLORS.green, 190),
+            hoverBackgroundColor: COLORS.green,
             borderRadius: 6,
             borderSkipped: false,
             maxBarThickness: 18,
@@ -1148,10 +996,13 @@ function initializeDashboardCharts() {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 700, easing: 'easeOutQuart' },
-        plugins: { legend: { display: false }, tooltip: tooltipStyle },
+        plugins: {
+          legend: { display: false },
+          tooltip: { ...tooltipStyle, callbacks: { label: (ctx) => `Estudo: ${ctx.parsed.y}%` } },
+        },
         scales: {
-          x: noBorderGrid('x'),
-          y: { ...noBorderGrid('y'), min: 0, ticks: { font: { size: 11 } } },
+          x: gridStyle('x'),
+          y: { ...gridStyle('y'), min: 0, max: 100, ticks: { callback: (v) => `${v}%`, font: { size: 11 } } },
         },
       },
     });
@@ -1165,19 +1016,10 @@ function initializeDashboardCharts() {
         labels,
         datasets: [
           {
-            label: `${state.ui.reportQuarter}T ${state.ui.reportYear}`,
+            label: `${summary.quarter}º Trimestre ${summary.year}`,
             data: offeringData,
-            backgroundColor: makeGradient(ctxOfertas, '#f0c184', '#e8a33d'),
-            hoverBackgroundColor: '#c9891d',
-            borderRadius: 6,
-            borderSkipped: false,
-            maxBarThickness: 16,
-          },
-          {
-            label: `${prevQuarter}T ${prevYear}`,
-            data: prevOfferingData,
-            backgroundColor: '#5b567f',
-            hoverBackgroundColor: '#726dab',
+            backgroundColor: makeGradient(ctxOfertas, COLORS.goldLine, COLORS.gold),
+            hoverBackgroundColor: '#a8701a',
             borderRadius: 6,
             borderSkipped: false,
             maxBarThickness: 16,
@@ -1190,38 +1032,46 @@ function initializeDashboardCharts() {
         animation: { duration: 700, easing: 'easeOutQuart' },
         plugins: {
           legend: { display: false },
-          tooltip: { ...tooltipStyle, callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y} MZN` } },
+          tooltip: { ...tooltipStyle, callbacks: { label: (ctx) => `${ctx.parsed.y} MZN` } },
         },
-        scales: { x: noBorderGrid('x'), y: noBorderGrid('y') },
+        scales: { x: gridStyle('x'), y: gridStyle('y') },
       },
     });
   }
 }
 
 function buildDashboard() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const quarter = Math.floor(now.getMonth() / 3) + 1;
   const memberCount = state.members.filter((m) => m.active).length;
-  const quarter = `${state.ui.reportYear}-T${state.ui.reportQuarter}`;
-  const quarterData = getDashboardQuarterReportData(state.ui.reportYear, state.ui.reportQuarter);
-  const attendance = Math.round(quarterData.reduce((sum, item) => sum + item.attendancePct, 0) / quarterData.length) || 0;
+  const quarterData = getDashboardQuarterReportData(year, quarter);
+  const attendance = quarterData.length ? Math.round(quarterData.reduce((sum, item) => sum + item.attendancePct, 0) / quarterData.length) : 0;
   const totalStudiedLesson = quarterData.reduce((sum, item) => sum + item.studiedLesson, 0);
   const averageStudiedLesson = quarterData.length ? Math.round(totalStudiedLesson / quarterData.length) : 0;
   const totalEnrolled = quarterData.reduce((sum, item) => sum + item.enrolled, 0);
   const averageEnrolled = quarterData.length ? Math.round(totalEnrolled / quarterData.length) : 0;
-  const memberActivityTotal = quarterData.reduce((sum, item) => sum + item.attendedWithVisits + item.enrolled, 0);
-  const averageMemberActivity = quarterData.length ? Math.round(memberActivityTotal / quarterData.length) : 0;
+  const memberActivityTotal = quarterData.reduce((sum, item) => sum + item.attendedWithVisits, 0);
+  const averageActive = quarterData.length ? Math.round(memberActivityTotal / quarterData.length) : 0;
   const totalOffering = quarterData.reduce((sum, item) => sum + item.offering, 0);
   const averageOffering = quarterData.length ? Math.round(totalOffering / quarterData.length) : 0;
+  const totalBaptized = quarterData.reduce((sum, item) => sum + (item.baptized || 0), 0);
+  const lessonPct = averageEnrolled ? Math.round((averageStudiedLesson / averageEnrolled) * 100) : 0;
 
   return {
+    year,
+    quarter,
     members: memberCount,
     attendance,
     averageStudiedLesson,
+    lessonPct,
     totalStudiedLesson,
     averageEnrolled,
-    averageMemberActivity,
+    averageActive,
     messages: state.messages.length,
     totalOffering,
     averageOffering,
+    totalBaptized,
     quarterData,
   };
 }
@@ -1275,7 +1125,7 @@ function getDashboardQuarterReportData(year, quarter) {
     const week = index + 1;
     const date = getWeeklyReportDateForQuarterWeek(year, quarter, week);
     const report = state.weeklyReports.find((item) => item.date === date);
-    const totals = report ? reportTotals(report) : { enrolled: 0, present: 0, visits: 0, studiedLesson: 0, offering: 0 };
+    const totals = report ? reportTotals(report) : { enrolled: 0, present: 0, visits: 0, studiedLesson: 0, offering: 0, baptized: 0 };
     return {
       week,
       date,
@@ -1284,6 +1134,7 @@ function getDashboardQuarterReportData(year, quarter) {
       visits: totals.visits,
       studiedLesson: totals.studiedLesson,
       offering: totals.offering,
+      baptized: totals.baptized || 0,
       attendedWithVisits: totals.present + totals.visits,
       attendancePct: totals.enrolled ? Math.round(((totals.present + totals.visits) / totals.enrolled) * 100) : 0,
     };
@@ -2979,14 +2830,15 @@ function printReport() {
 function printDashboard() {
   if (!isSecretary()) return;
   const summary = buildDashboard();
-  const year = state.ui.reportYear;
-  const quarter = state.ui.reportQuarter;
+  const year = summary.year;
+  const quarter = summary.quarter;
   const periodLabel = `${quarter}º Trimestre ${year}`;
   const quarterData = summary.quarterData;
   const totalVisits = quarterData.reduce((sum, item) => sum + item.visits, 0);
-  const totalBaptized = quarterData.reduce((sum, item) => sum + item.baptized, 0);
-  const requestTotals = getQuarterlyRequestTotalsByClass(state.ui.requestQuarter);
+  const totalBaptized = summary.totalBaptized;
+  const requestTotals = getQuarterlyRequestTotalsByClass(getQuarterKey(year, quarter));
   const ranking = rankingRows("quarter", year, quarter);
+  const currentWeek = reportWeekForDate(todayISO());
 
   const html = `
     <html>
@@ -3010,7 +2862,7 @@ function printDashboard() {
       </head>
       <body>
         <h1>Visão Geral - ${periodLabel}</h1>
-        <div class="meta">Semana ${state.ui.reportWeek} de 13 · Gerado em ${escapeHTML(weeklyReportLabel(getWeeklyReportDate()))}</div>
+        <div class="meta">Semana ${currentWeek} de 13 · Gerado em ${escapeHTML(weeklyReportLabel(todayISO()))}</div>
 
         <div class="section">
           <h2>Resumo do trimestre</h2>
