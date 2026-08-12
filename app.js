@@ -79,6 +79,8 @@ const seed = () => ({
     editMemberId: null,
     settingsTab: "weights",
     sidebarOpen: false,
+    materialType: "foto",
+    materialQuarter: currentQuarter(),
   },
   classes: [
     { id: "classe-01-adultos", name: "Classe 01-Adultos" },
@@ -102,6 +104,7 @@ const seed = () => ({
   weeklyReports: [],
   programs: [],
   messages: [],
+  materials: [],
 });
 
 
@@ -368,6 +371,16 @@ function persist() {
 async function loadSharedState() {
   const data = await apiFetch("/api/state");
   Object.assign(state, data);
+  await loadMaterials();
+}
+
+async function loadMaterials() {
+  try {
+    const data = await apiFetch("/api/materials");
+    state.materials = data.materials || [];
+  } catch (err) {
+    console.error("Falha ao carregar lições eletrónicas:", err);
+  }
 }
 
 let state = seed();
@@ -591,6 +604,7 @@ function shellView() {
     ["dashboard", "Visão Geral", "home"],
     ["members", "Membros", "members"],
     ...(secretary ? [["attendance", "Presenças", "attendance"], ["lessons", "Lições", "lessons"], ["requests", "Trimensários", "requests"]] : []),
+    ["materials", "Lições Eletrónicas", "lessons"],
     ["program", "Programa", "program"],
     ["ranking", "Classe em Destaque", "ranking"],
     ["reports", "Relatórios", "reports"],
@@ -655,6 +669,7 @@ function pageTitle(view) {
     ranking: "Classe em Destaque",
     attendance: "Presenças",
     lessons: "Lições e Estudos",
+    materials: "Lições Eletrónicas",
     requests: "Requisições de Trimensários",
     messages: "Comunicação e Notificações",
     account: "Minha Conta",
@@ -682,6 +697,8 @@ function renderView() {
       return secretary ? attendanceView() : readOnlyPanel("O registo de presenças é restrito à direcção.");
     case "lessons":
       return secretary ? lessonsView() : readOnlyPanel("A gestão de lições é restrita à direcção.");
+    case "materials":
+      return materialsView();
     case "requests":
       return secretary ? requestsView() : readOnlyPanel("As requisições de trimensários são geridas pela direcção.");
     case "program":
@@ -708,6 +725,7 @@ function readOnlyPanel(message) {
 }
 
 function dashboardView() {
+  const secretary = isSecretary();
   const summary = buildDashboard();
   const quarter = state.ui.reportQuarter;
   const week = state.ui.reportWeek;
@@ -739,53 +757,59 @@ function dashboardView() {
 
   return `
     <style>
-      .dashboard-wrap{font-family:'Source Sans 3',sans-serif;color:#1B2A45;background:transparent;}
+      .dashboard-wrap{
+        --night:#141a30; --card:#1c2440; --card-line:#333e64;
+        --dawn:#e8a33d; --dawn-soft:#f0c184; --dusk:#c96a6a; --good:#7fb99a;
+        --dtext:#f1eee3; --dmuted:#9aa5c9; --dmuted-2:#6b7699;
+        font-family:'Source Sans 3',sans-serif;color:var(--dtext);
+        background:var(--night);border-radius:18px;padding:28px 26px 34px;
+        margin:-4px -4px 0;
+      }
       .dashboard-wrap .wrap{max-width:1180px;margin:0 auto;}
-      .dashboard-wrap header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #1B2A45;}
-      .dashboard-wrap .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#C79A3E;font-weight:600;margin-bottom:6px;}
-      .dashboard-wrap h1{font-family:'Fraunces',serif;font-weight:600;font-size:32px;margin:0;line-height:1.1;}
-      .dashboard-wrap .top-meta{text-align:right;font-size:13px;color:#3C4E6E;line-height:1.5;margin-left:auto;}
-      .dashboard-wrap .top-meta strong{color:#1B2A45;}
+      .dashboard-wrap .horizon{height:3px;width:100%;border-radius:3px;margin-bottom:24px;
+        background:linear-gradient(90deg, var(--night) 0%, var(--dusk) 35%, var(--dawn) 65%, var(--night) 100%);}
+      .dashboard-wrap header.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:24px;}
+      .dashboard-wrap .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dawn-soft);font-weight:600;margin-bottom:6px;}
+      .dashboard-wrap h1{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:32px;margin:0;line-height:1.1;color:var(--dtext);}
+      .dashboard-wrap .top-meta{text-align:right;font-size:13px;color:var(--dmuted);line-height:1.5;margin-left:auto;}
+      .dashboard-wrap .top-meta strong{color:var(--dawn-soft);}
       .dashboard-wrap .filters{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:20px;}
-      .dashboard-wrap .filters .field{min-width:160px;}
-      .dashboard-wrap .filters label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#3C4E6E;margin-bottom:6px;}
-      .dashboard-wrap .filters select{width:100%;padding:10px 12px;border:1px solid #E4DCC9;border-radius:8px;background:#fff;color:#1B2A45;font-size:14px;}
-      .dashboard-wrap .filters .btn{margin-left:auto;align-self:center;}
+      .dashboard-wrap .filters .field{min-width:150px;}
+      .dashboard-wrap .filters label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--dmuted);margin-bottom:6px;}
+      .dashboard-wrap .filters select{width:100%;padding:10px 12px;border:1px solid var(--card-line);border-radius:8px;background:var(--card);color:var(--dtext);font-size:14px;}
       .dashboard-wrap .kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;}
-      .dashboard-wrap .kpi-chip{background:#fff;border:1px solid #E4DCC9;border-left:3px solid #C79A3E;border-radius:6px;padding:14px 16px;}
-      .dashboard-wrap .kpi-chip-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#3C4E6E;font-weight:600;margin-bottom:6px;}
-      .dashboard-wrap .kpi-chip-value{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#1B2A45;display:block;line-height:1.15;}
-      .dashboard-wrap .kpi-chip-value.small{font-size:16px;}
-      .dashboard-wrap .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;}
-      .dashboard-wrap .card{background:#fff;border:1px solid #E4DCC9;border-radius:6px;padding:22px 22px 18px;position:relative;overflow:hidden;}
+      .dashboard-wrap .kpi-chip{background:var(--card);border:1px solid var(--card-line);border-top:2px solid var(--dawn);border-radius:10px;padding:16px 18px;}
+      .dashboard-wrap .kpi-chip-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dmuted);font-weight:600;margin-bottom:8px;}
+      .dashboard-wrap .kpi-chip-value{font-family:'Fraunces',Georgia,serif;font-size:24px;font-weight:700;color:var(--dtext);display:block;line-height:1.15;}
+      .dashboard-wrap .kpi-chip-value.small{font-size:17px;}
+      .dashboard-wrap .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
+      .dashboard-wrap .card{background:var(--card);border:1px solid var(--card-line);border-radius:10px;padding:22px 22px 18px;position:relative;overflow:hidden;}
       .dashboard-wrap .card.wide{grid-column:span 2;}
       .dashboard-wrap .card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
-      .dashboard-wrap .card-title{font-family:'Fraunces',serif;font-size:17px;font-weight:600;margin:0 0 3px;}
-      .dashboard-wrap .card-sub{font-size:12.5px;color:#3C4E6E;}
+      .dashboard-wrap .card-title{font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:600;margin:0 0 3px;color:var(--dtext);}
+      .dashboard-wrap .card-sub{font-size:12.5px;color:var(--dmuted);}
       .dashboard-wrap .kpi{text-align:right;}
-      .dashboard-wrap .kpi .num{font-family:'Fraunces',serif;font-size:26px;font-weight:700;display:block;line-height:1;}
-      .dashboard-wrap .kpi .delta{font-size:12px;font-weight:600;display:inline-block;margin-top:5px;padding:2px 7px;border-radius:20px;}
-      .dashboard-wrap .delta.up{background:#DCE8DC;color:#5C7F5E;}
-      .dashboard-wrap .delta.down{background:#F0DCD1;color:#A15A3E;}
-      .dashboard-wrap .chart-box{position:relative;height:190px;background:#F8F5EE;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#7A7A7A;font-size:14px;text-transform:uppercase;letter-spacing:.08em;}
+      .dashboard-wrap .kpi .num{font-family:'Fraunces',Georgia,serif;font-size:24px;font-weight:700;display:block;line-height:1;color:var(--dtext);}
+      .dashboard-wrap .kpi .delta{font-size:12px;font-weight:600;display:inline-block;margin-top:5px;padding:2px 8px;border-radius:20px;}
+      .dashboard-wrap .delta.up{background:rgba(127,185,154,0.16);color:var(--good);}
+      .dashboard-wrap .delta.down{background:rgba(201,106,106,0.16);color:var(--dusk);}
+      .dashboard-wrap .chart-box{position:relative;height:190px;}
       .dashboard-wrap .chart-box.short{height:150px;}
-      .dashboard-wrap .legend-row{display:flex;gap:16px;margin-top:10px;font-size:12px;color:#3C4E6E;flex-wrap:wrap;}
+      .dashboard-wrap .legend-row{display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--dmuted);flex-wrap:wrap;}
       .dashboard-wrap .legend-row span{display:flex;align-items:center;gap:6px;}
       .dashboard-wrap .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
-      .dashboard-wrap .foot-note{margin-top:8px;font-size:12px;color:#3C4E6E;border-top:1px dashed #E4DCC9;padding-top:10px;}
+      .dashboard-wrap .foot-note{margin-top:8px;font-size:12px;color:var(--dmuted);border-top:1px dashed var(--card-line);padding-top:10px;}
       .dashboard-wrap .class-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
-      .dashboard-wrap .class-table th{text-align:left;font-weight:600;color:#3C4E6E;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-bottom:8px;border-bottom:1px solid #E4DCC9;}
-      .dashboard-wrap .class-table td{padding:9px 0;border-bottom:1px solid #E4DCC9;}
+      .dashboard-wrap .class-table th{text-align:left;font-weight:600;color:var(--dmuted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-bottom:8px;border-bottom:1px solid var(--card-line);}
+      .dashboard-wrap .class-table td{padding:9px 0;border-bottom:1px solid var(--card-line);color:var(--dtext);}
       .dashboard-wrap .class-table tr:last-child td{border-bottom:none;}
-      .dashboard-wrap .bar-track{background:#DCE8DC;border-radius:20px;height:7px;width:100%;overflow:hidden;}
-      .dashboard-wrap .bar-fill{background:#5C7F5E;height:100%;border-radius:20px;}
-      .dashboard-wrap .bar-fill.gold{background:#C79A3E;}
-      .dashboard-wrap .bar-fill.clay{background:#A15A3E;}
-      .dashboard-wrap .signature{font-family:'Fraunces',serif;font-style:italic;color:#3C4E6E;text-align:center;font-size:13px;margin-top:34px;}
-      @media (max-width:760px){.dashboard-wrap .card.wide{grid-column:span 1;}}
+      .dashboard-wrap .dash-actions{display:flex;justify-content:flex-end;margin-top:24px;padding-top:20px;border-top:1px solid var(--card-line);}
+      .dashboard-wrap .signature{font-family:'Fraunces',Georgia,serif;font-style:italic;color:var(--dmuted);text-align:center;font-size:13px;margin-top:22px;}
+      @media (max-width:760px){.dashboard-wrap .card.wide{grid-column:span 1;} .dashboard-wrap{padding:20px 16px 26px;}}
     </style>
     <div class="dashboard-wrap">
       <div class="wrap">
+        <div class="horizon"></div>
         <header class="top">
           <div>
             <p class="eyebrow">IASD Canaã · Pemba</p>
@@ -821,7 +845,6 @@ function dashboardView() {
                 .join("")}
             </select>
           </div>
-          <button class="btn warn" type="button" data-action="print-dashboard">${icon("print")} Exportar PDF</button>
         </div>
         <div class="kpi-strip">
           <div class="kpi-chip">
@@ -855,8 +878,8 @@ function dashboardView() {
             </div>
             <div class="chart-box"><canvas id="chartMembros"></canvas></div>
             <div class="legend-row">
-              <span><i class="dot" style="background:#5C7F5E"></i> Presentes</span>
-              <span><i class="dot" style="background:#A15A3E"></i> Matriculados</span>
+              <span><i class="dot" style="background:#7fb99a"></i> Presentes</span>
+              <span><i class="dot" style="background:#e8a33d"></i> Matriculados</span>
             </div>
           </div>
 
@@ -873,9 +896,9 @@ function dashboardView() {
             </div>
             <div class="chart-box short"><canvas id="chartFrequencia"></canvas></div>
             <div class="legend-row">
-              <span><i class="dot" style="background:#5C7F5E"></i> ≥75%</span>
-              <span><i class="dot" style="background:#C79A3E"></i> 50–74%</span>
-              <span><i class="dot" style="background:#A15A3E"></i> &lt;50%</span>
+              <span><i class="dot" style="background:#7fb99a"></i> ≥75%</span>
+              <span><i class="dot" style="background:#e8a33d"></i> 50–74%</span>
+              <span><i class="dot" style="background:#c96a6a"></i> &lt;50%</span>
             </div>
           </div>
 
@@ -892,7 +915,7 @@ function dashboardView() {
             </div>
             <div class="chart-box short"><canvas id="chartLicao"></canvas></div>
             <div class="legend-row">
-              <span><i class="dot" style="background:#5C7F5E"></i> Lição estudada</span>
+              <span><i class="dot" style="background:#7fb99a"></i> Lição estudada</span>
             </div>
           </div>
 
@@ -943,17 +966,24 @@ function dashboardView() {
             </div>
             <div class="chart-box"><canvas id="chartOfertas"></canvas></div>
             <div class="legend-row">
-              <span><i class="dot" style="background:#C79A3E"></i> Trimestre atual</span>
-              <span><i class="dot" style="background:#E7CE95"></i> Trimestre anterior</span>
+              <span><i class="dot" style="background:#e8a33d"></i> Trimestre atual</span>
+              <span><i class="dot" style="background:#5b567f"></i> Trimestre anterior</span>
             </div>
           </div>
         </div>
+
+        ${secretary ? `
+        <div class="dash-actions">
+          <button class="btn warn" type="button" data-action="print-dashboard">${icon("print")} Exportar PDF</button>
+        </div>
+        ` : ""}
 
         <p class="signature">"Coração e Alma da Igreja! Centro de ação eu irei…!"</p>
       </div>
     </div>
   `;
 }
+
 
 function initializeDashboardCharts() {
   if (state.ui.view !== 'dashboard' || typeof Chart !== 'function') return;
@@ -969,24 +999,24 @@ function initializeDashboardCharts() {
   destroyChart('chartOfertas');
 
   Chart.defaults.font.family = "'Source Sans 3', sans-serif";
-  Chart.defaults.color = '#3C4E6E';
+  Chart.defaults.color = '#9aa5c9';
 
   const tooltipStyle = {
-    backgroundColor: '#1B2A45',
-    titleColor: '#F8F5EE',
+    backgroundColor: '#0f1428',
+    titleColor: '#f1eee3',
     titleFont: { family: "'Fraunces', serif", size: 13, weight: '600' },
-    bodyColor: '#F8F5EE',
+    bodyColor: '#f1eee3',
     bodyFont: { size: 12 },
     padding: 10,
     cornerRadius: 8,
     displayColors: false,
     caretSize: 6,
-    borderColor: '#C79A3E',
+    borderColor: '#e8a33d',
     borderWidth: 1,
   };
 
   const noBorderGrid = (axis) => ({
-    grid: { color: '#E4DCC9', display: axis === 'y' },
+    grid: { color: 'rgba(255,255,255,0.08)', display: axis === 'y' },
     ticks: { font: { size: 11 } },
     border: { display: false },
   });
@@ -1021,22 +1051,22 @@ function initializeDashboardCharts() {
           {
             label: 'Presentes',
             data: presentData,
-            borderColor: '#5C7F5E',
-            backgroundColor: makeGradient(ctxMembros, 'rgba(92,127,94,0.32)', 'rgba(92,127,94,0.02)'),
+            borderColor: '#7fb99a',
+            backgroundColor: makeGradient(ctxMembros, 'rgba(127,185,154,0.32)', 'rgba(127,185,154,0.02)'),
             borderWidth: 2.5,
             fill: true,
             tension: 0.4,
             pointRadius: 3,
             pointHoverRadius: 6,
             pointBackgroundColor: '#fff',
-            pointBorderColor: '#5C7F5E',
+            pointBorderColor: '#7fb99a',
             pointBorderWidth: 2,
-            pointHoverBackgroundColor: '#5C7F5E',
+            pointHoverBackgroundColor: '#7fb99a',
           },
           {
             label: 'Matriculados',
             data: enrolledData,
-            borderColor: '#A15A3E',
+            borderColor: '#e8a33d',
             backgroundColor: 'transparent',
             borderWidth: 2,
             borderDash: [5, 4],
@@ -1044,9 +1074,9 @@ function initializeDashboardCharts() {
             pointRadius: 2.5,
             pointHoverRadius: 5,
             pointBackgroundColor: '#fff',
-            pointBorderColor: '#A15A3E',
+            pointBorderColor: '#e8a33d',
             pointBorderWidth: 2,
-            pointHoverBackgroundColor: '#A15A3E',
+            pointHoverBackgroundColor: '#e8a33d',
           },
         ],
       },
@@ -1063,7 +1093,7 @@ function initializeDashboardCharts() {
 
   const ctxFrequencia = document.getElementById('chartFrequencia');
   if (ctxFrequencia) {
-    const barColors = attendanceData.map((value) => (value >= 75 ? '#5C7F5E' : value >= 50 ? '#C79A3E' : '#A15A3E'));
+    const barColors = attendanceData.map((value) => (value >= 75 ? '#7fb99a' : value >= 50 ? '#e8a33d' : '#c96a6a'));
     new Chart(ctxFrequencia, {
       type: 'bar',
       data: {
@@ -1106,8 +1136,8 @@ function initializeDashboardCharts() {
           {
             label: 'Lições estudadas',
             data: lessonData,
-            backgroundColor: makeGradient(ctxLicao, '#7A9C7C', '#5C7F5E', 150),
-            hoverBackgroundColor: '#4A6B4C',
+            backgroundColor: makeGradient(ctxLicao, '#7fb99a', '#4f8a6c', 150),
+            hoverBackgroundColor: '#3f7359',
             borderRadius: 6,
             borderSkipped: false,
             maxBarThickness: 18,
@@ -1137,8 +1167,8 @@ function initializeDashboardCharts() {
           {
             label: `${state.ui.reportQuarter}T ${state.ui.reportYear}`,
             data: offeringData,
-            backgroundColor: makeGradient(ctxOfertas, '#D9AE55', '#C79A3E'),
-            hoverBackgroundColor: '#B4872F',
+            backgroundColor: makeGradient(ctxOfertas, '#f0c184', '#e8a33d'),
+            hoverBackgroundColor: '#c9891d',
             borderRadius: 6,
             borderSkipped: false,
             maxBarThickness: 16,
@@ -1146,8 +1176,8 @@ function initializeDashboardCharts() {
           {
             label: `${prevQuarter}T ${prevYear}`,
             data: prevOfferingData,
-            backgroundColor: '#EFDDB0',
-            hoverBackgroundColor: '#E7CE95',
+            backgroundColor: '#5b567f',
+            hoverBackgroundColor: '#726dab',
             borderRadius: 6,
             borderSkipped: false,
             maxBarThickness: 16,
@@ -1641,7 +1671,7 @@ function reportsView() {
           </div>
           <div class="toolbar">
             <button class="btn primary" type="submit">${icon("reports")} Actualizar</button>
-            <button class="btn warn" type="button" data-action="print-report">${icon("print")} Exportar PDF</button>
+            ${secretary ? `<button class="btn warn" type="button" data-action="print-report">${icon("print")} Exportar PDF</button>` : ""}
           </div>
         </form>
       </div>
@@ -2345,6 +2375,30 @@ function wireEvents() {
   const messageForm = document.getElementById("messageForm");
   if (messageForm) messageForm.addEventListener("submit", handleMessageSubmit);
 
+  const materialForm = document.getElementById("materialForm");
+  if (materialForm) materialForm.addEventListener("submit", handleMaterialUploadSubmit);
+
+  const materialTypeSelect = document.querySelector("[data-action='material-type-toggle']");
+  const materialFileWrap = document.getElementById("materialFileWrap");
+  const materialUrlWrap = document.getElementById("materialUrlWrap");
+  const syncMaterialFieldsVisibility = () => {
+    if (!materialTypeSelect) return;
+    const type = materialTypeSelect.value;
+    state.ui.materialType = type;
+    if (materialFileWrap) materialFileWrap.classList.toggle("hidden", type === "link");
+    if (materialUrlWrap) materialUrlWrap.classList.toggle("hidden", type === "foto" || type === "pdf");
+    const fileInput = document.getElementById("materialFile");
+    if (fileInput) fileInput.accept = type === "foto" ? "image/*" : type === "pdf" ? "application/pdf" : type === "video" ? "video/*" : "";
+  };
+  if (materialTypeSelect) {
+    materialTypeSelect.addEventListener("change", syncMaterialFieldsVisibility);
+    syncMaterialFieldsVisibility();
+  }
+
+  document.querySelectorAll("[data-action='remove-material']").forEach((button) => {
+    button.addEventListener("click", () => handleMaterialDelete(button.dataset.id));
+  });
+
   const messageTargetSelect = document.querySelector("[data-action='message-target-toggle']");
   const messageRecipientWrap = document.getElementById("messageRecipientWrap");
   const syncMessageRecipientVisibility = () => {
@@ -2704,7 +2758,86 @@ async function handleMessageSubmit(event) {
   }
 }
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const commaIndex = result.indexOf(",");
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = () => reject(new Error("Não foi possível ler o ficheiro."));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleMaterialUploadSubmit(event) {
+  event.preventDefault();
+  if (!isSecretary()) return;
+  const form = event.currentTarget;
+  const title = form.querySelector("#materialTitle").value.trim();
+  const quarter = Number(form.querySelector("#materialQuarter").value);
+  const type = form.querySelector("#materialType").value;
+  const description = form.querySelector("#materialDescription").value.trim();
+  const url = form.querySelector("#materialUrl").value.trim();
+  const fileInput = form.querySelector("#materialFile");
+  const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+  if (!title) {
+    alert("Indique um título para o material.");
+    return;
+  }
+  if ((type === "foto" || type === "pdf") && !file) {
+    alert("Escolha um ficheiro para enviar.");
+    return;
+  }
+  if (type === "link" && !url) {
+    alert("Indique o link do material.");
+    return;
+  }
+  if (type === "video" && !file && !url) {
+    alert("Envie um ficheiro de vídeo ou indique um link (ex: YouTube).");
+    return;
+  }
+  if (file && file.size > 22 * 1024 * 1024) {
+    alert("O ficheiro é demasiado grande (máx. ~22MB). Para vídeos maiores, partilhe um link (ex: YouTube, Google Drive).");
+    return;
+  }
+
+  const submitButton = form.querySelector("button[type='submit']");
+  if (submitButton) submitButton.disabled = true;
+  try {
+    const payload = { title, description, quarter, type, url };
+    if (file) {
+      payload.dataBase64 = await fileToBase64(file);
+      payload.fileName = file.name;
+      payload.mimeType = file.type || "application/octet-stream";
+    }
+    await apiFetch("/api/materials", { method: "POST", body: JSON.stringify(payload) });
+    state.ui.materialType = "foto";
+    await loadMaterials();
+    render();
+  } catch (err) {
+    alert(err.message || "Não foi possível publicar o material.");
+  } finally {
+    if (submitButton) submitButton.disabled = false;
+  }
+}
+
+async function handleMaterialDelete(id) {
+  if (!isSecretary()) return;
+  if (!window.confirm("Remover este material? Esta acção não pode ser desfeita.")) return;
+  try {
+    await apiFetch(`/api/materials/${id}`, { method: "DELETE" });
+    await loadMaterials();
+    render();
+  } catch (err) {
+    alert(err.message || "Não foi possível remover o material.");
+  }
+}
+
 function printReport() {
+  if (!isSecretary()) return;
   const year = state.ui.reportYear;
   const quarter = state.ui.reportQuarter;
   const week = state.ui.reportWeek;
@@ -2844,6 +2977,7 @@ function printReport() {
 }
 
 function printDashboard() {
+  if (!isSecretary()) return;
   const summary = buildDashboard();
   const year = state.ui.reportYear;
   const quarter = state.ui.reportQuarter;
@@ -3361,6 +3495,106 @@ function lessonsView() {
   `;
 }
 
+function materialTypeLabel(type) {
+  return { foto: "Foto", video: "Vídeo", pdf: "PDF", link: "Link" }[type] || type;
+}
+
+function materialFileUrl(material) {
+  return `/api/materials/${encodeURIComponent(material.id)}/file?token=${encodeURIComponent(getToken() || "")}`;
+}
+
+function materialLink(material) {
+  if (material.hasFile) return materialFileUrl(material);
+  if (material.url) return material.url;
+  return null;
+}
+
+function materialsView() {
+  const secretary = isSecretary();
+  const materials = (state.materials || []).slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+  return `
+    <section class="${secretary ? "grid two" : ""}">
+      ${secretary ? `
+      <div class="panel">
+        <div class="section-header">
+          <div>
+            <h2>Partilhar lição eletrónica</h2>
+            <p class="muted">Foto, vídeo, PDF ou um link (ex: YouTube, Google Drive).</p>
+          </div>
+        </div>
+        <form id="materialForm" class="form-grid">
+          <div class="form-grid two">
+            <div class="field">
+              <label for="materialTitle">Título</label>
+              <input id="materialTitle" name="title" required placeholder="Ex: Lição 5 - slides" />
+            </div>
+            <div class="field">
+              <label for="materialQuarter">Trimestre</label>
+              <select id="materialQuarter" name="quarter">
+                ${[1, 2, 3, 4].map((v) => `<option value="${v}" ${state.ui.materialQuarter === v ? "selected" : ""}>${v}º Trimestre</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="materialType">Tipo</label>
+            <select id="materialType" name="type" data-action="material-type-toggle">
+              <option value="foto" ${state.ui.materialType === "foto" ? "selected" : ""}>Foto</option>
+              <option value="video" ${state.ui.materialType === "video" ? "selected" : ""}>Vídeo</option>
+              <option value="pdf" ${state.ui.materialType === "pdf" ? "selected" : ""}>PDF</option>
+              <option value="link" ${state.ui.materialType === "link" ? "selected" : ""}>Link (YouTube, Google Drive...)</option>
+            </select>
+          </div>
+          <div class="field" id="materialFileWrap">
+            <label for="materialFile">Ficheiro (até ~22MB)</label>
+            <input id="materialFile" name="file" type="file" />
+          </div>
+          <div class="field" id="materialUrlWrap">
+            <label for="materialUrl">Link</label>
+            <input id="materialUrl" name="url" type="url" placeholder="https://..." />
+          </div>
+          <div class="field">
+            <label for="materialDescription">Descrição (opcional)</label>
+            <textarea id="materialDescription" name="description" placeholder="Ex: material de apoio da lição 5"></textarea>
+          </div>
+          <button class="btn primary" type="submit">${icon("lessons")} Publicar</button>
+        </form>
+      </div>
+      ` : ""}
+      <div class="panel">
+        <div class="section-header">
+          <div>
+            <h2>Materiais partilhados</h2>
+            <p class="muted">${materials.length} ${materials.length === 1 ? "material" : "materiais"} disponíveis</p>
+          </div>
+        </div>
+        <div class="material-grid">
+          ${materials
+            .map((material) => {
+              const link = materialLink(material);
+              return `
+                <div class="material-card">
+                  <div class="material-card-top">
+                    <span class="chip alt">${materialTypeLabel(material.type)}</span>
+                    <span class="chip gray">${material.quarter ? `${material.quarter}º Trim.` : "—"}</span>
+                  </div>
+                  <strong class="material-title">${escapeHTML(material.title)}</strong>
+                  ${material.description ? `<p class="material-desc">${escapeHTML(material.description)}</p>` : ""}
+                  <div class="material-meta">${escapeHTML(material.createdBy)} · ${formatDate(material.createdAt)}</div>
+                  <div class="material-actions">
+                    ${link ? `<a class="btn primary" href="${escapeHTML(link)}" target="_blank" rel="noopener">${icon("reports")} Ver / Descarregar</a>` : `<span class="muted">Sem ficheiro nem link</span>`}
+                    ${secretary ? `<button type="button" class="btn danger" data-action="remove-material" data-id="${material.id}">Remover</button>` : ""}
+                  </div>
+                </div>
+              `;
+            })
+            .join("") || `<div class="muted-box">Ainda não há materiais partilhados${secretary ? "" : " pela direcção"}.</div>`}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function programView() {
   const items = programsForDate(state.ui.programDate);
   if (!isSecretary()) {
@@ -3521,7 +3755,7 @@ function messagesView() {
   const selectedConversation = conversations.find((item) => item.key === selectedKey) || conversations[0] || null;
   const unreadConversations = buildConversationSummaries(messages, false).filter((item) => item.unreadCount > 0).length;
   return `
-    <section class="grid two">
+    <section class="grid two messages">
       <div class="panel">
         <div class="section-header">
           <div>
@@ -3588,7 +3822,7 @@ function messagesView() {
                   <p class="muted">${selectedConversation.messages.length} mensagens nesta conversa</p>
                 </div>
               </div>
-              ${messageListChat(selectedConversation.messages)}
+              <div class="chat-list">${messageListChat(selectedConversation.messages)}</div>
             `
                 : `<div class="muted-box">Nenhuma conversa disponível.</div>`
             }

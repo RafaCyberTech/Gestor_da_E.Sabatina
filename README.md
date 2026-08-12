@@ -81,6 +81,16 @@ Isto complementa, mas não substitui, uma cópia de segurança externa
 regular (por exemplo, descarregar o ficheiro `data/escola-sabatina.db`
 de vez em quando para um local separado).
 
+## Actualizar uma instalação existente (migração de base de dados)
+
+Esta versão acrescenta a funcionalidade "Lições Eletrónicas" (materiais
+partilhados pela direcção: fotos, vídeos, PDFs ou links). Antes de pôr
+esta versão em produção, corra uma única vez, no SQL Editor do
+Supabase, o ficheiro `migracao-materiais.sql` incluído neste projecto
+— ele cria a tabela `materials` necessária. Sem isso, o servidor
+arranca normalmente, mas a secção "Lições Eletrónicas" mostra um erro
+ao carregar.
+
 ## Hospedar para acesso pela internet
 
 Como os dados agora vivem no servidor (não no navegador), pode hospedar
@@ -118,8 +128,17 @@ Pontos importantes:
 - Relatórios filtráveis e impressão para PDF
 - Visão Geral com gráficos (crescimento de membros, frequência,
   estudo da lição, ofertas) com cores que destacam o desempenho de
-  cada sábado
-- Comunicação entre membros e direcção
+  cada sábado. A exportação em PDF do Visão Geral e dos Relatórios
+  fica visível apenas para a direcção — contas de membro não têm
+  acesso a descarregar relatórios.
+- Lições Eletrónicas: a direcção partilha fotos, vídeos, PDFs ou
+  links (ex: YouTube, Google Drive) das lições da Escola Sabatina.
+  Todos os membros podem ver e descarregar; só a direcção pode
+  publicar ou remover. Ficheiros até cerca de 22MB — para vídeos
+  maiores, recomenda-se partilhar um link em vez de enviar o
+  ficheiro.
+- Comunicação entre membros e direcção, com chat por conversa numa
+  área maior e com scroll próprio
 - Cópias de segurança automáticas da base de dados
 
 ## Limitação conhecida

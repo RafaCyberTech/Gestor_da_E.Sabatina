@@ -364,24 +364,23 @@ function sendJSON(res, status, payload) {
   res.end(body);
 }
 
-function readJSONBody(req) {
+function readJSONBody(req, maxBytes = 2 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
-    let data = "";
+    const chunks = [];
     let size = 0;
-    const MAX = 2 * 1024 * 1024; // 2MB é mais do que suficiente para este uso
     req.on("data", (chunk) => {
       size += chunk.length;
-      if (size > MAX) {
+      if (size > maxBytes) {
         reject(new Error("payload too large"));
         req.destroy();
         return;
       }
-      data += chunk;
+      chunks.push(chunk);
     });
     req.on("end", () => {
-      if (!data) return resolve({});
+      if (!chunks.length) return resolve({});
       try {
-        resolve(JSON.parse(data));
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
       } catch (err) {
         reject(err);
       }
@@ -390,9 +389,20 @@ function readJSONBody(req) {
   });
 }
 
+// Materiais (lições eletrónicas) podem incluir fotos, vídeos e PDFs em
+// base64, por isso aceitam um corpo bem maior do que as restantes rotas.
+const MATERIAL_MAX_BYTES = 30 * 1024 * 1024; // ~30MB (o base64 acrescenta ~33%)
+
 async function authenticate(req) {
   const header = req.headers["authorization"] || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  let token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  // Pedidos de navegação directa (ex: abrir um material num separador novo)
+  // não conseguem enviar o cabeçalho Authorization, por isso aceitamos
+  // também o token por query string só para esse caso.
+  if (!token) {
+    const queryToken = new URL(req.url, "http://localhost").searchParams.get("token");
+    if (queryToken) token = queryToken;
+  }
   return getUserByToken(token);
 }
 
@@ -552,6 +562,105 @@ async function handleApi(req, res, urlPath) {
       await pool.query("DELETE FROM sessions WHERE user_id = $1", [r.id]);
       await pool.query("DELETE FROM users WHERE id = $1", [r.id]);
     }
+    return sendJSON(res, 200, { ok: true });
+  }
+
+  // ---------------------------------------------------------------------
+  // Lições eletrónicas (materiais) — a direcção partilha fotos, vídeos,
+  // PDFs ou links; todos os utilizadores autenticados podem ver e
+  // descarregar. Só a direcção pode publicar ou remover.
+  // ---------------------------------------------------------------------
+
+  // Listar materiais (apenas metadados — o ficheiro em si só é enviado
+  // quando pedido em /api/materials/:id/file, para a lista carregar rápido)
+  if (req.method === "GET" && urlPath === "/api/materials") {
+    const { rows } = await pool.query(
+      `SELECT id, title, description, quarter, type, file_name AS "fileName",
+              mime_type AS "mimeType", url, created_by AS "createdBy", created_at AS "createdAt",
+              (file_data IS NOT NULL) AS "hasFile"
+       FROM materials ORDER BY created_at DESC`
+    );
+    return sendJSON(res, 200, { materials: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) });
+  }
+
+  // Publicar um novo material — só a direcção
+  if (req.method === "POST" && urlPath === "/api/materials") {
+    if (user.role !== "secretary") return sendJSON(res, 403, { error: "Só a direcção pode partilhar lições eletrónicas." });
+    const body = await readJSONBody(req, MATERIAL_MAX_BYTES);
+    const title = String(body.title || "").trim();
+    const type = String(body.type || "").trim(); // "foto" | "video" | "pdf" | "link"
+    if (!title) return sendJSON(res, 400, { error: "Indique um título para o material." });
+    if (!["foto", "video", "pdf", "link"].includes(type)) return sendJSON(res, 400, { error: "Tipo de material inválido." });
+
+    let fileBuffer = null;
+    if (body.dataBase64) {
+      try {
+        fileBuffer = Buffer.from(String(body.dataBase64), "base64");
+      } catch {
+        return sendJSON(res, 400, { error: "Ficheiro inválido." });
+      }
+      if (fileBuffer.length > MATERIAL_MAX_BYTES) {
+        return sendJSON(res, 413, { error: "Ficheiro demasiado grande (máx. ~22MB)." });
+      }
+    }
+    if (type === "link" && !fileBuffer && !String(body.url || "").trim()) {
+      return sendJSON(res, 400, { error: "Indique o link do material." });
+    }
+    if (["foto", "pdf"].includes(type) && !fileBuffer) {
+      return sendJSON(res, 400, { error: "Escolha um ficheiro para enviar." });
+    }
+    if (type === "video" && !fileBuffer && !String(body.url || "").trim()) {
+      return sendJSON(res, 400, { error: "Envie um ficheiro de vídeo ou indique um link (ex: YouTube)." });
+    }
+
+    const id = `mat_${crypto.randomBytes(6).toString("hex")}`;
+    await pool.query(
+      `INSERT INTO materials (id, title, description, quarter, type, file_name, mime_type, file_data, url, created_by, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+      [
+        id,
+        title,
+        String(body.description || "").trim() || null,
+        body.quarter || null,
+        type,
+        body.fileName || null,
+        body.mimeType || null,
+        fileBuffer,
+        String(body.url || "").trim() || null,
+        user.name,
+      ]
+    );
+    const { rows } = await pool.query(
+      `SELECT id, title, description, quarter, type, file_name AS "fileName",
+              mime_type AS "mimeType", url, created_by AS "createdBy", created_at AS "createdAt",
+              (file_data IS NOT NULL) AS "hasFile"
+       FROM materials WHERE id = $1`,
+      [id]
+    );
+    return sendJSON(res, 200, { material: { ...rows[0], createdAt: rows[0].createdAt.toISOString() } });
+  }
+
+  // Descarregar/ver o ficheiro de um material. Como é um pedido de
+  // navegação directa (ex: abrir num separador novo), aceita o token
+  // também por query string além do cabeçalho Authorization.
+  if (req.method === "GET" && parts[1] === "materials" && parts[2] && parts[3] === "file") {
+    const id = parts[2];
+    const { rows } = await pool.query("SELECT file_name, mime_type, file_data FROM materials WHERE id = $1", [id]);
+    const row = rows[0];
+    if (!row || !row.file_data) return sendJSON(res, 404, { error: "Ficheiro não encontrado." });
+    res.writeHead(200, {
+      "Content-Type": row.mime_type || "application/octet-stream",
+      "Content-Length": row.file_data.length,
+      "Content-Disposition": `inline; filename="${(row.file_name || "material").replace(/"/g, "")}"`,
+      "Cache-Control": "private, max-age=3600",
+    });
+    return res.end(row.file_data);
+  }
+
+  // Remover um material — só a direcção
+  if (req.method === "DELETE" && parts[1] === "materials" && parts[2]) {
+    if (user.role !== "secretary") return sendJSON(res, 403, { error: "Só a direcção pode remover materiais." });
+    await pool.query("DELETE FROM materials WHERE id = $1", [parts[2]]);
     return sendJSON(res, 200, { ok: true });
   }
 
