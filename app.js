@@ -1,5 +1,19 @@
 const LOGO_MAIN = "./logo/logo-main.png";
 const LOGO_SECONDARY = "./logo/logo-secondary.png";
+const PROJECT_CREATOR = {
+  name: "RafaCyberTech",
+  role: "Seguranca Alem do Click",
+  email: "rafiqueusebionorapelana@gmail.com",
+  phone: "844239917",
+  year: "2026",
+  github: "https://github.com/RafaCyberTech",
+  portfolio: "https://rafacybertech.github.io/Portfolio/",
+  website: "https://rafacybertech.github.io/Ciberseguranca/",
+  tiktok: "https://www.tiktok.com/@rafiqueeusebionor",
+  facebook: "https://www.facebook.com/profile.php?id=61552410900666",
+  instagram: "https://www.instagram.com/rafacyber",
+  youtube: "https://www.youtube.com/@RafaCyberTech",
+};
 
 // Helper functions - must be defined before seed()
 function localISODate(date) {
@@ -49,6 +63,7 @@ const icon = (name) => {
     edit: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`,
     account: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>`,
     lock: `<svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>`,
+    info: `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>`,
   };
   return map[name] || "";
 };
@@ -610,6 +625,7 @@ function shellView() {
     ["reports", "Relatórios", "reports"],
     ["messages", "Comunicação", "messages"],
     ["account", "Minha Conta", "account"],
+    ["about", "Sobre o projeto", "info"],
   ];
 
   const summary = dashboardSummary();
@@ -673,6 +689,7 @@ function pageTitle(view) {
     requests: "Requisições de Trimensários",
     messages: "Comunicação e Notificações",
     account: "Minha Conta",
+    about: "Sobre o Projeto",
   }[view] || "Sistema";
 }
 
@@ -711,6 +728,8 @@ function renderView() {
       return messagesView();
     case "account":
       return accountView();
+    case "about":
+      return aboutView();
     default:
       return dashboardView();
   }
@@ -3535,6 +3554,93 @@ function programView() {
   `;
 }
 
+function aboutView() {
+  return `
+    <section class="about-hero panel">
+      <div class="about-hero-mark">
+        <img src="${LOGO_MAIN}" alt="Logo da Escola Sabatina" />
+      </div>
+      <div>
+        <span class="chip alt">Informacoes do projeto</span>
+        <h2>Sistema de Gestao da Escola Sabatina</h2>
+        <p class="muted">Aplicacao web criada para a IASD - Canaa, Pemba, com informacao partilhada entre a direcao e os membros em todos os dispositivos.</p>
+      </div>
+    </section>
+
+    <section class="grid two about-grid">
+      <div class="panel">
+        <div class="section-header">
+          <div>
+            <h2>Objetivo, finalidade e publico-alvo</h2>
+            <p class="muted">Por que este sistema foi criado</p>
+          </div>
+        </div>
+        <div class="about-copy">
+          <div>
+            <strong>Objetivo</strong>
+            <p>Organizar e centralizar a gestao da Escola Sabatina, facilitando o acompanhamento das atividades e dos resultados.</p>
+          </div>
+          <div>
+            <strong>Finalidade</strong>
+            <p>Tornar simples o registo de membros, presencas, licoes, ofertas, programas, comunicacao e relatorios, com acesso seguro e informacao atualizada.</p>
+          </div>
+          <div>
+            <strong>Publico-alvo</strong>
+            <p>Direcao, secretaria, professores e membros da Escola Sabatina da IASD - Canaa, Pemba.</p>
+          </div>
+        </div>
+        <h3 class="about-subtitle">Principais recursos</h3>
+        <div class="about-features">
+          <span class="chip gray">Gestao de membros</span>
+          <span class="chip gray">Presencas e licoes</span>
+          <span class="chip gray">Programacao</span>
+          <span class="chip gray">Relatorios</span>
+          <span class="chip gray">Comunicacao</span>
+        </div>
+      </div>
+
+      <div class="panel creator-card">
+        <div class="section-header">
+          <div>
+            <h2>Criador do projeto</h2>
+            <p class="muted">Informacoes de contacto</p>
+          </div>
+          <div class="creator-avatar">${escapeHTML(PROJECT_CREATOR.name.slice(0, 1).toUpperCase())}</div>
+        </div>
+        <div class="creator-details">
+          <div><span class="note">Nome</span><strong>${escapeHTML(PROJECT_CREATOR.name)}</strong></div>
+          <div><span class="note">Funcao</span><strong>${escapeHTML(PROJECT_CREATOR.role)}</strong></div>
+          <div><span class="note">Email</span><strong>${escapeHTML(PROJECT_CREATOR.email)}</strong></div>
+          <div><span class="note">Telefone</span><strong>${escapeHTML(PROJECT_CREATOR.phone)}</strong></div>
+          <div><span class="note">Ano de criacao</span><strong>${escapeHTML(PROJECT_CREATOR.year)}</strong></div>
+          <div><span class="note">GitHub</span><a href="${escapeHTML(PROJECT_CREATOR.github)}" target="_blank" rel="noopener noreferrer">RafaCyberTech</a></div>
+          <div><span class="note">Portfolio</span><a href="${escapeHTML(PROJECT_CREATOR.portfolio)}" target="_blank" rel="noopener noreferrer">Ver portfolio</a></div>
+          <div><span class="note">Site oficial</span><a href="${escapeHTML(PROJECT_CREATOR.website)}" target="_blank" rel="noopener noreferrer">Ciberseguranca</a></div>
+          <div><span class="note">TikTok</span><a href="${escapeHTML(PROJECT_CREATOR.tiktok)}" target="_blank" rel="noopener noreferrer">@rafiqueeusebionor</a></div>
+          <div><span class="note">Facebook</span><a href="${escapeHTML(PROJECT_CREATOR.facebook)}" target="_blank" rel="noopener noreferrer">RafaCyberTech</a></div>
+          <div><span class="note">Instagram</span><a href="${escapeHTML(PROJECT_CREATOR.instagram)}" target="_blank" rel="noopener noreferrer">@rafacyber</a></div>
+          <div><span class="note">YouTube</span><strong>${PROJECT_CREATOR.youtube ? `<a href="${escapeHTML(PROJECT_CREATOR.youtube)}" target="_blank" rel="noopener noreferrer">Canal oficial</a>` : "Link nao informado"}</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel about-meta-card">
+      <div>
+        <span class="note">Versao do sistema</span>
+        <strong>1.0.0</strong>
+      </div>
+      <div>
+        <span class="note">Desenvolvido para</span>
+        <strong>Escola Sabatina Canaã Pemba</strong>
+      </div>
+      <div>
+        <span class="note">Ano</span>
+        <strong>2026</strong>
+      </div>
+    </section>
+  `;
+}
+
 function accountView() {
   const user = currentUser();
   const secretary = isSecretary();
@@ -4012,4 +4118,3 @@ async function boot() {
 }
 
 boot();
-
