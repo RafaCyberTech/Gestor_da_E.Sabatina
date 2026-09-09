@@ -6,23 +6,23 @@ informação, esteja onde estiver).
 
 ## Requisitos
 
-- **Node.js 22.5 ou mais recente** (usa o módulo nativo `node:sqlite`,
-  ainda experimental). O servidor verifica isto automaticamente ao
-  arrancar e avisa com uma mensagem clara se a versão for antiga.
-- Não é preciso `npm install` — o servidor não usa nenhuma dependência
-  externa, só módulos nativos do Node (`http`, `crypto`, `node:sqlite`).
+- **Node.js 22.5 ou mais recente**.
+- Uma base de dados **PostgreSQL/Supabase** e a respetiva `DATABASE_URL`.
+- Instale as dependências uma vez com `npm install`.
 
 ## Como executar localmente
 
+1. Execute [supabase-schema.sql](supabase-schema.sql) no SQL Editor do Supabase.
+2. Defina a ligação à base e inicie o servidor:
+
 ```bash
-node servidor.js
+DATABASE_URL="postgresql://..." node servidor.js
 ```
 
 Depois abra `http://127.0.0.1:4173` no navegador.
 
-A base de dados fica gravada em `data/escola-sabatina.db` (criada
-automaticamente e vazia na primeira execução — ver "Primeiro acesso"
-abaixo).
+Os dados ficam guardados na base PostgreSQL configurada. Na primeira execução,
+o servidor cria automaticamente a conta inicial — ver "Primeiro acesso" abaixo.
 
 ## Primeiro acesso
 
@@ -65,31 +65,18 @@ direcção também pode repor a senha de qualquer conta a partir de
   apagar as suas próprias mensagens — o servidor impõe isto, não é só a
   interface que esconde botões.
 
-## Cópias de segurança automáticas
+## Cópias de segurança
 
-O servidor faz uma cópia de segurança da base de dados automaticamente
-a cada 6 horas (mais uma cópia logo ao arrancar), guardadas em
-`data/backups/`. Mantém as últimas 28 cópias (cerca de uma semana) e
-apaga as mais antigas automaticamente. Pode ajustar isto com variáveis
-de ambiente:
+Os dados vivem no PostgreSQL/Supabase. Configure as cópias de segurança e a
+retenção diretamente no serviço de base de dados; este servidor não cria uma
+pasta local `data/backups/`.
 
-```bash
-BACKUP_INTERVAL_HOURS=6 BACKUP_KEEP=28 node servidor.js
-```
+## Atualizar uma instalação existente
 
-Isto complementa, mas não substitui, uma cópia de segurança externa
-regular (por exemplo, descarregar o ficheiro `data/escola-sabatina.db`
-de vez em quando para um local separado).
-
-## Actualizar uma instalação existente (migração de base de dados)
-
-Esta versão acrescenta a funcionalidade "Lições Eletrónicas" (materiais
-partilhados pela direcção: fotos, vídeos, PDFs ou links). Antes de pôr
-esta versão em produção, corra uma única vez, no SQL Editor do
-Supabase, o ficheiro `migracao-materiais.sql` incluído neste projecto
-— ele cria a tabela `materials` necessária. Sem isso, o servidor
-arranca normalmente, mas a secção "Lições Eletrónicas" mostra um erro
-ao carregar.
+Com uma base Supabase já configurada, execute apenas
+[supabase-migration-messages.sql](supabase-migration-messages.sql) no SQL Editor.
+Ele adiciona a ligação segura entre cada mensagem e a conta que a enviou.
+O [supabase-schema.sql](supabase-schema.sql) é destinado somente a instalações novas.
 
 ## Hospedar para acesso pela internet
 
@@ -102,11 +89,9 @@ Pontos importantes:
    serviços de hospedagem (Render, Railway, Fly.io) já dá HTTPS
    automaticamente. Numa VPS própria, use algo como Caddy ou Nginx com
    Let's Encrypt à frente do `node servidor.js`.
-2. **Guarde a pasta `data/`** — é onde ficam a base de dados e as
-   cópias de segurança automáticas. Confirme que o seu plano de
-   hospedagem tem "disco persistente" ou "volume" — em muitos planos
-   gratuitos o disco não é permanente e os dados desapareceriam a cada
-   reinício.
+2. **Guarde a `DATABASE_URL` como segredo** no serviço de hospedagem.
+   A persistência dos dados é responsabilidade da instância PostgreSQL/Supabase,
+   não do disco local do servidor web.
 3. **Variável `PORT`** — a maioria dos serviços de hospedagem define
    automaticamente a variável de ambiente `PORT`; o servidor já a lê.
 4. **Mude a senha inicial da conta DIRECAO** assim que entrar pela
@@ -139,7 +124,7 @@ Pontos importantes:
   ficheiro.
 - Comunicação entre membros e direcção, com chat por conversa numa
   área maior e com scroll próprio
-- Cópias de segurança automáticas da base de dados
+- Dados centralizados no PostgreSQL/Supabase
 
 ## Limitação conhecida
 

@@ -181,8 +181,9 @@ async function getAppData() {
     classes: classesByReport[r.id] || [],
   }));
 
+  // sender_user_id é a fonte de verdade para permissões; o nome é só apresentação.
   const messagesRes = await pool.query(
-    `SELECT id, created_at, from_name AS "from", from_role AS "fromRole", target,
+    `SELECT id, created_at, from_name AS "from", from_role AS "fromRole", sender_user_id AS "senderUserId", target,
             recipient_member_id AS "recipientMemberId", recipient_name AS "recipientName",
             subject, body, read
      FROM messages ORDER BY created_at DESC`
@@ -199,6 +200,8 @@ async function getAppData() {
 const SHARED_KEYS = ["settings", "classes", "members", "attendance", "lessons", "quarterlyRequests", "weeklyReports", "programs"];
 
 async function setAppData(next) {
+  // Cada coleção recebida substitui a coleção inteira dentro desta transação.
+  // Não altere esta ordem sem rever as dependências entre as tabelas.
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -412,7 +415,6 @@ async function authenticate(req) {
 async function handleApi(req, res, urlPath) {
   const parts = urlPath.split("/").filter(Boolean); // ["api", ...]
 
-  // POST /api/auth/login
   if (req.method === "POST" && urlPath === "/api/auth/login") {
     const body = await readJSONBody(req);
     const username = String(body.username || "").trim();
@@ -433,7 +435,6 @@ async function handleApi(req, res, urlPath) {
     return sendJSON(res, 200, { token, user: sanitizeUser(row) });
   }
 
-  // A partir daqui, todas as rotas precisam de autenticação
   const user = await authenticate(req);
 
   if (req.method === "POST" && urlPath === "/api/auth/logout") {
@@ -449,7 +450,6 @@ async function handleApi(req, res, urlPath) {
     return sendJSON(res, 200, { user: sanitizeUser(user) });
   }
 
-  // Mudar a própria senha (exige a senha actual)
   if (req.method === "POST" && urlPath === "/api/auth/password") {
     const body = await readJSONBody(req);
     const currentPassword = String(body.currentPassword || "");
@@ -514,9 +514,9 @@ async function handleApi(req, res, urlPath) {
     }
     const id = `msg_${crypto.randomBytes(6).toString("hex")}`;
     await pool.query(
-      `INSERT INTO messages (id, from_name, from_role, target, recipient_member_id, recipient_name, subject, body, read)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)`,
-      [id, user.name, user.role, target, target === "member" ? recipientMemberId : null, recipientName, String(body.subject || "").trim(), String(body.body || "").trim()]
+      `INSERT INTO messages (id, from_name, from_role, sender_user_id, target, recipient_member_id, recipient_name, subject, body, read)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)`,
+      [id, user.name, user.role, user.id, target, target === "member" ? recipientMemberId : null, recipientName, String(body.subject || "").trim(), String(body.body || "").trim()]
     );
     const data = await getAppData();
     return sendJSON(res, 200, { messages: data.messages });
@@ -527,7 +527,7 @@ async function handleApi(req, res, urlPath) {
     const { rows } = await pool.query("SELECT * FROM messages WHERE id = $1", [id]);
     const message = rows[0];
     if (!message) return sendJSON(res, 404, { error: "Mensagem não encontrada." });
-    const canDelete = user.role === "secretary" || (message.from_role === "member" && message.from_name === user.name);
+    const canDelete = user.role === "secretary" || (message.from_role === "member" && message.sender_user_id === user.id);
     if (!canDelete) return sendJSON(res, 403, { error: "Só pode remover a sua própria mensagem." });
     await pool.query("DELETE FROM messages WHERE id = $1", [id]);
     const data = await getAppData();
@@ -583,7 +583,6 @@ async function handleApi(req, res, urlPath) {
     return sendJSON(res, 200, { materials: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) });
   }
 
-  // Publicar um novo material — só a direcção
   if (req.method === "POST" && urlPath === "/api/materials") {
     if (user.role !== "secretary") return sendJSON(res, 403, { error: "Só a direcção pode partilhar lições eletrónicas." });
     const body = await readJSONBody(req, MATERIAL_MAX_BYTES);
@@ -657,7 +656,6 @@ async function handleApi(req, res, urlPath) {
     return res.end(row.file_data);
   }
 
-  // Remover um material — só a direcção
   if (req.method === "DELETE" && parts[1] === "materials" && parts[2]) {
     if (user.role !== "secretary") return sendJSON(res, 403, { error: "Só a direcção pode remover materiais." });
     await pool.query("DELETE FROM materials WHERE id = $1", [parts[2]]);

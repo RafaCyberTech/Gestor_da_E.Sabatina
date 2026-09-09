@@ -15,7 +15,6 @@ const PROJECT_CREATOR = {
   youtube: "https://www.youtube.com/@RafaCyberTech",
 };
 
-// Helper functions - must be defined before seed()
 function localISODate(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -194,7 +193,8 @@ function markMessagesAsSeen(messageIds = null) {
 function canSeeMessage(user, message) {
   if (!user || !message) return false;
   if (user.role === "secretary") return true;
-  if (message.from === user.name && message.fromRole === user.role) return true;
+  // A identidade da conta evita confundir membros que têm o mesmo nome.
+  if (message.senderUserId === user.id && message.fromRole === user.role) return true;
   if (message.target === "all") return true;
   if (message.target === "secretary") return true;
   if (message.target === "member" && message.recipientMemberId && message.recipientMemberId === user.memberId) return true;
@@ -369,11 +369,7 @@ function sharedDataSlice() {
   return out;
 }
 
-// persist() é chamado por toda a aplicação depois de qualquer alteração ao
-// estado. Continua síncrono na chamada (para não obrigar a mudar as dezenas
-// de sítios que o invocam), mas por trás envia os dados partilhados ao
-// servidor sempre que quem está a usar a app é a secretaria. Alterações só
-// de interface (ui) ficam gravadas apenas neste dispositivo.
+// A interface fica local; a direção sincroniza apenas dados partilhados.
 function persist() {
   persistUiLocal();
   if (isSecretary()) {
@@ -404,6 +400,7 @@ state.currentUser = null;
 
 
 const app = document.getElementById("app");
+let dashboardRefreshTimer = null;
 
 function currentUser() {
   return state.currentUser || null;
@@ -442,7 +439,7 @@ function visibleMessages() {
 function canModifyMessage(message) {
   if (isSecretary()) return true;
   const user = currentUser();
-  return user?.role === "member" && message.fromRole === "member" && message.from === user.name;
+  return user?.role === "member" && message.fromRole === "member" && message.senderUserId === user.id;
 }
 
 function sessionsForClass(classId) {
@@ -919,10 +916,10 @@ function initializeDashboardCharts() {
 
   const summary = buildDashboard();
   const labels = summary.quarterData.map((item) => `S${item.week}`);
-  const enrolledData = summary.quarterData.map((item) => item.enrolled);
-  const attendanceData = summary.quarterData.map((item) => item.attendancePct);
-  const lessonPctData = summary.quarterData.map((item) => (item.enrolled ? Math.round((item.studiedLesson / item.enrolled) * 100) : 0));
-  const offeringData = summary.quarterData.map((item) => item.offering);
+  const enrolledData = summary.quarterData.map((item) => (item.hasReport ? item.enrolled : null));
+  const attendanceData = summary.quarterData.map((item) => (item.hasReport ? item.attendancePct : null));
+  const lessonPctData = summary.quarterData.map((item) => (item.hasReport && item.enrolled ? Math.round((item.studiedLesson / item.enrolled) * 100) : null));
+  const offeringData = summary.quarterData.map((item) => (item.hasReport ? item.offering : null));
 
   const ctxMembros = document.getElementById('chartMembros');
   if (ctxMembros) {
@@ -1065,15 +1062,18 @@ function buildDashboard() {
   const quarter = Math.floor(now.getMonth() / 3) + 1;
   const memberCount = state.members.filter((m) => m.active).length;
   const quarterData = getDashboardQuarterReportData(year, quarter);
-  const attendance = quarterData.length ? Math.round(quarterData.reduce((sum, item) => sum + item.attendancePct, 0) / quarterData.length) : 0;
-  const totalStudiedLesson = quarterData.reduce((sum, item) => sum + item.studiedLesson, 0);
-  const averageStudiedLesson = quarterData.length ? Math.round(totalStudiedLesson / quarterData.length) : 0;
-  const totalEnrolled = quarterData.reduce((sum, item) => sum + item.enrolled, 0);
-  const averageEnrolled = quarterData.length ? Math.round(totalEnrolled / quarterData.length) : 0;
-  const memberActivityTotal = quarterData.reduce((sum, item) => sum + item.attendedWithVisits, 0);
-  const averageActive = quarterData.length ? Math.round(memberActivityTotal / quarterData.length) : 0;
+  // Os gráficos mantêm as 13 semanas para mostrar lacunas, mas as médias usam
+  // apenas semanas que já têm relatório — uma semana futura não pode valer zero.
+  const reportedWeeks = quarterData.filter((item) => item.hasReport);
+  const attendance = reportedWeeks.length ? Math.round(reportedWeeks.reduce((sum, item) => sum + item.attendancePct, 0) / reportedWeeks.length) : 0;
+  const totalStudiedLesson = reportedWeeks.reduce((sum, item) => sum + item.studiedLesson, 0);
+  const averageStudiedLesson = reportedWeeks.length ? Math.round(totalStudiedLesson / reportedWeeks.length) : 0;
+  const totalEnrolled = reportedWeeks.reduce((sum, item) => sum + item.enrolled, 0);
+  const averageEnrolled = reportedWeeks.length ? Math.round(totalEnrolled / reportedWeeks.length) : 0;
+  const memberActivityTotal = reportedWeeks.reduce((sum, item) => sum + item.present, 0);
+  const averageActive = reportedWeeks.length ? Math.round(memberActivityTotal / reportedWeeks.length) : 0;
   const totalOffering = quarterData.reduce((sum, item) => sum + item.offering, 0);
-  const averageOffering = quarterData.length ? Math.round(totalOffering / quarterData.length) : 0;
+  const averageOffering = reportedWeeks.length ? Math.round(totalOffering / reportedWeeks.length) : 0;
   const totalBaptized = quarterData.reduce((sum, item) => sum + (item.baptized || 0), 0);
   const lessonPct = averageEnrolled ? Math.round((averageStudiedLesson / averageEnrolled) * 100) : 0;
 
@@ -1092,6 +1092,7 @@ function buildDashboard() {
     averageOffering,
     totalBaptized,
     quarterData,
+    reportedWeeks: reportedWeeks.length,
   };
 }
 
@@ -1148,6 +1149,7 @@ function getDashboardQuarterReportData(year, quarter) {
     return {
       week,
       date,
+      hasReport: Boolean(report),
       enrolled: totals.enrolled,
       present: totals.present,
       visits: totals.visits,
@@ -1155,7 +1157,7 @@ function getDashboardQuarterReportData(year, quarter) {
       offering: totals.offering,
       baptized: totals.baptized || 0,
       attendedWithVisits: totals.present + totals.visits,
-      attendancePct: totals.enrolled ? Math.round(((totals.present + totals.visits) / totals.enrolled) * 100) : 0,
+      attendancePct: totals.enrolled ? Math.round((totals.present / totals.enrolled) * 100) : 0,
     };
   });
 }
@@ -1442,7 +1444,6 @@ function reportsView() {
   const editableRows = reportRowsFromReport(weeklyReport);
   const quarterSummary = quarterSummaryForDate(weekDate);
   const automaticQuarterSummary = buildAutomaticReportSummary(reportsForQuarter(year, quarter), requestedLessonsForQuarter(year, quarter));
-  // build competitive rows depending on selected period
   let competitiveRows = [];
   if (period === "week") {
     competitiveRows = reportRowsFromReport(weeklyReport);
@@ -1646,7 +1647,6 @@ function reportsView() {
                       </div>
                     `;
                   }
-                  // quarter or year aggregated
                   return `
                     <div class="activity-item">
                       <div>
@@ -2027,6 +2027,26 @@ function render() {
   app.innerHTML = state.session ? shellView() : loginView();
   initializeDashboardCharts();
   wireEvents();
+  configureDashboardAutoRefresh();
+}
+
+function configureDashboardAutoRefresh() {
+  if (dashboardRefreshTimer) {
+    window.clearInterval(dashboardRefreshTimer);
+    dashboardRefreshTimer = null;
+  }
+  if (!state.session || state.ui.view !== "dashboard") return;
+
+  // Atualização leve para dados lançados noutro dispositivo; não roda fora do Dashboard.
+  dashboardRefreshTimer = window.setInterval(async () => {
+    try {
+      const data = await apiFetch("/api/state");
+      Object.assign(state, data);
+      if (state.session && state.ui.view === "dashboard") render();
+    } catch (err) {
+      console.error("Falha ao atualizar dados da Visão Geral:", err);
+    }
+  }, 30000);
 }
 
 function wireEvents() {
@@ -2402,11 +2422,7 @@ async function handleMemberSubmit(event) {
     const newMemberId = uid("m");
     state.members.push({ id: newMemberId, ...payload });
 
-    // Criar automaticamente uma conta de acesso para o novo membro, usando
-    // o primeiro nome como utilizador. A senha é escolhida e encriptada no
-    // servidor; nunca circula em claro no lado do cliente. Se já existir
-    // alguém com o mesmo primeiro nome, acrescenta-se um número (ex:
-    // "joao2") para que o utilizador seja sempre único.
+    // O servidor garante o nome único; este ciclo resolve colisões previsíveis.
     const baseUsername = normalizeUsername(payload.name.split(" ")[0]) || "membro";
     let attemptUsername = baseUsername;
     let attempt = 1;
@@ -2717,7 +2733,6 @@ function printReport() {
   const weeklyReport = buildWeeklyReportFromReport(weeklyExisting || { date: weekDate, classes: reportRowsFromReport(null) });
   const quarterSummary = quarterSummaryForDate(weekDate);
   
-  // build competitive rows
   let competitiveRows = [];
   const reports = state.weeklyReports.filter((item) => reportQuarterForDate(item.date) === getQuarterKey(year, quarter));
   const count = reports.length || 1;
@@ -2748,6 +2763,7 @@ function printReport() {
   });
 
   const periodLabel = `Trimestre ${quarter} ${year}`;
+  const selectedWeekLabel = `Semana ${week} de 13 · ${weeklyReportLabel(weekDate)}`;
   const html = `
     <html>
       <head>
@@ -2756,6 +2772,7 @@ function printReport() {
           body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#12201d}
           h1,h2{margin:24px 0 12px;font-size:1.4rem}
           h1{border-bottom:2px solid #58706b;padding-bottom:8px}
+          .report-period{color:#58706b;font-size:.9rem;margin-top:-4px}
           .section{margin-bottom:32px}
           .metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:12px}
           .metric{border:1px solid #c8d6d2;border-radius:8px;padding:12px}
@@ -2773,6 +2790,7 @@ function printReport() {
       </head>
       <body>
         <h1>Relatório - ${periodLabel}</h1>
+        <div class="report-period">${escapeHTML(selectedWeekLabel)}</div>
         
         <div class="section">
           <h2>Quadro comparativo</h2>
@@ -2848,6 +2866,50 @@ function printReport() {
 
 function printDashboard() {
   if (!isSecretary()) return;
+  const dashboard = document.querySelector(".dashboard-wrap");
+  if (!dashboard) return;
+
+  // A clonagem de um canvas perde o desenho do Chart.js. Substituímos cada
+  // canvas por uma imagem, mantendo no PDF os mesmos gráficos vistos no ecrã.
+  const printableDashboard = dashboard.cloneNode(true);
+  printableDashboard.querySelector(".d-actions")?.remove();
+  const originalCharts = dashboard.querySelectorAll("canvas");
+  printableDashboard.querySelectorAll("canvas").forEach((canvas, index) => {
+    const image = document.createElement("img");
+    image.src = originalCharts[index]?.toDataURL("image/png") || "";
+    image.alt = "Gráfico da Visão Geral";
+    image.className = "dashboard-print-chart";
+    image.width = originalCharts[index]?.width || 600;
+    image.height = originalCharts[index]?.height || 190;
+    canvas.replaceWith(image);
+  });
+
+  const currentDashboardHtml = `
+    <html>
+      <head>
+        <base href="${window.location.href}">
+        <title>Visão Geral</title>
+        <link rel="stylesheet" href="styles.css">
+        <style>
+          body{margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          .dashboard-wrap{margin:0!important;border-radius:0!important}
+          .dashboard-print-chart{display:block;width:100%!important;height:190px!important;object-fit:fill}
+          @page{size:A4 landscape;margin:10mm}
+        </style>
+      </head>
+      <body>${printableDashboard.outerHTML}<script>window.onload=()=>{window.print();}</script></body>
+    </html>
+  `;
+  const currentDashboardWindow = window.open("", "_blank", "width=1180,height=800");
+  if (!currentDashboardWindow) {
+    alert("O navegador bloqueou a janela de impressão.");
+    return;
+  }
+  currentDashboardWindow.document.open();
+  currentDashboardWindow.document.write(currentDashboardHtml);
+  currentDashboardWindow.document.close();
+  return;
+
   const summary = buildDashboard();
   const year = summary.year;
   const quarter = summary.quarter;
