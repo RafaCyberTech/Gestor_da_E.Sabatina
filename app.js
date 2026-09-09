@@ -3602,24 +3602,35 @@ function aboutView() {
       <div class="panel creator-card">
         <div class="section-header">
           <div>
-            <h2>Criador do projeto</h2>
-            <p class="muted">Informacoes de contacto</p>
+            <h2>Informações do autor</h2>
+            <p class="muted">Créditos e identificação do projeto</p>
           </div>
           <div class="creator-avatar">${escapeHTML(PROJECT_CREATOR.name.slice(0, 1).toUpperCase())}</div>
         </div>
-        <div class="creator-details">
-          <div><span class="note">Nome</span><strong>${escapeHTML(PROJECT_CREATOR.name)}</strong></div>
-          <div><span class="note">Funcao</span><strong>${escapeHTML(PROJECT_CREATOR.role)}</strong></div>
-          <div><span class="note">Email</span><strong>${escapeHTML(PROJECT_CREATOR.email)}</strong></div>
-          <div><span class="note">Telefone</span><strong>${escapeHTML(PROJECT_CREATOR.phone)}</strong></div>
-          <div><span class="note">Ano de criacao</span><strong>${escapeHTML(PROJECT_CREATOR.year)}</strong></div>
-          <div><span class="note">GitHub</span><a href="${escapeHTML(PROJECT_CREATOR.github)}" target="_blank" rel="noopener noreferrer">RafaCyberTech</a></div>
-          <div><span class="note">Portfolio</span><a href="${escapeHTML(PROJECT_CREATOR.portfolio)}" target="_blank" rel="noopener noreferrer">Ver portfolio</a></div>
-          <div><span class="note">Site oficial</span><a href="${escapeHTML(PROJECT_CREATOR.website)}" target="_blank" rel="noopener noreferrer">Ciberseguranca</a></div>
-          <div><span class="note">TikTok</span><a href="${escapeHTML(PROJECT_CREATOR.tiktok)}" target="_blank" rel="noopener noreferrer">@rafiqueeusebionor</a></div>
-          <div><span class="note">Facebook</span><a href="${escapeHTML(PROJECT_CREATOR.facebook)}" target="_blank" rel="noopener noreferrer">RafaCyberTech</a></div>
-          <div><span class="note">Instagram</span><a href="${escapeHTML(PROJECT_CREATOR.instagram)}" target="_blank" rel="noopener noreferrer">@rafacyber</a></div>
-          <div><span class="note">YouTube</span><strong>${PROJECT_CREATOR.youtube ? `<a href="${escapeHTML(PROJECT_CREATOR.youtube)}" target="_blank" rel="noopener noreferrer">Canal oficial</a>` : "Link nao informado"}</strong></div>
+        <div class="creator-details creator-summary">
+          <h3>Sistema de Gestão da Escola Sabatina</h3>
+          <p>Desenvolvido por <strong>${escapeHTML(PROJECT_CREATOR.name)} | ${escapeHTML(PROJECT_CREATOR.role)}!</strong></p>
+          <p>Estudante de Tecnologia da Informação</p>
+          <p class="creator-description">Desenvolvedor do sistema e responsável pelo projeto.</p>
+          <div class="creator-meta">
+            <span><strong>Versão:</strong> 1.0.0</span>
+            <span><strong>Ano:</strong> ${escapeHTML(PROJECT_CREATOR.year)}</span>
+          </div>
+          <p class="creator-copyright">© ${escapeHTML(PROJECT_CREATOR.year)} RafaCyber. Todos os direitos reservados.</p>
+          <div class="creator-contacts">
+            <h4>Contactos e redes sociais</h4>
+            <div class="creator-contact-grid">
+              <a href="mailto:${escapeHTML(PROJECT_CREATOR.email)}"><span>Email</span>${escapeHTML(PROJECT_CREATOR.email)}</a>
+              <a href="tel:${escapeHTML(PROJECT_CREATOR.phone)}"><span>Telefone</span>${escapeHTML(PROJECT_CREATOR.phone)}</a>
+              <a href="${escapeHTML(PROJECT_CREATOR.github)}" target="_blank" rel="noopener noreferrer"><span>GitHub</span>RafaCyberTech</a>
+              <a href="${escapeHTML(PROJECT_CREATOR.portfolio)}" target="_blank" rel="noopener noreferrer"><span>Portfólio</span>Ver portfólio</a>
+              <a href="${escapeHTML(PROJECT_CREATOR.website)}" target="_blank" rel="noopener noreferrer"><span>Site oficial</span>Cibersegurança</a>
+              <a href="${escapeHTML(PROJECT_CREATOR.tiktok)}" target="_blank" rel="noopener noreferrer"><span>TikTok</span>@rafiqueeusebionor</a>
+              <a href="${escapeHTML(PROJECT_CREATOR.facebook)}" target="_blank" rel="noopener noreferrer"><span>Facebook</span>RafaCyberTech</a>
+              <a href="${escapeHTML(PROJECT_CREATOR.instagram)}" target="_blank" rel="noopener noreferrer"><span>Instagram</span>@rafacyber</a>
+              <a href="${escapeHTML(PROJECT_CREATOR.youtube)}" target="_blank" rel="noopener noreferrer"><span>YouTube</span>Canal oficial</a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
