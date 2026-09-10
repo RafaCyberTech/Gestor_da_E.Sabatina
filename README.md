@@ -10,6 +10,17 @@ informação, esteja onde estiver).
 - Uma base de dados **PostgreSQL/Supabase** e a respetiva `DATABASE_URL`.
 - Instale as dependências uma vez com `npm install`.
 
+> ⚠️ **Use a connection string do "Connection pooler" (Supavisor), não a
+> "directa".** No painel do Supabase, em *Project Settings → Database →
+> Connection string*, existem duas opções. A ligação **directa**
+> (`db.xxxx.supabase.co:5432`) só responde por **IPv6**, e serviços como o
+> Render, Railway ou Fly.io normalmente só têm saída **IPv4** — por isso o
+> servidor nunca consegue ligar-se à base de dados e a aplicação fica
+> inacessível ("não é possível ligar ao servidor"), mesmo com a
+> `DATABASE_URL` correcta. A ligação através do **pooler**
+> (algo como `postgresql://postgres.<ref>:<senha>@aws-0-<regiao>.pooler.supabase.com:6543/postgres`)
+> funciona por IPv4 e é a que deve usar em produção.
+
 ## Como executar localmente
 
 1. Execute [supabase-schema.sql](supabase-schema.sql) no SQL Editor do Supabase.
@@ -23,6 +34,10 @@ Depois abra `http://127.0.0.1:4173` no navegador.
 
 Os dados ficam guardados na base PostgreSQL configurada. Na primeira execução,
 o servidor cria automaticamente a conta inicial — ver "Primeiro acesso" abaixo.
+
+Se o servidor não conseguir ligar-se à base de dados ao arrancar, verá uma
+mensagem de erro explicativa no log (por exemplo, no separador "Logs" do
+Render) a indicar a causa mais provável.
 
 ## Primeiro acesso
 
@@ -89,7 +104,10 @@ Pontos importantes:
    serviços de hospedagem (Render, Railway, Fly.io) já dá HTTPS
    automaticamente. Numa VPS própria, use algo como Caddy ou Nginx com
    Let's Encrypt à frente do `node servidor.js`.
-2. **Guarde a `DATABASE_URL` como segredo** no serviço de hospedagem.
+2. **Guarde a `DATABASE_URL` como segredo** no serviço de hospedagem, e
+   use a connection string do **pooler do Supabase** (ver aviso na secção
+   "Requisitos" acima) — é a causa mais comum de "não é possível ligar ao
+   servidor" depois de hospedar no Render/Railway/Fly.io.
    A persistência dos dados é responsabilidade da instância PostgreSQL/Supabase,
    não do disco local do servidor web.
 3. **Variável `PORT`** — a maioria dos serviços de hospedagem define
@@ -97,6 +115,12 @@ Pontos importantes:
 4. **Mude a senha inicial da conta DIRECAO** assim que entrar pela
    primeira vez, antes de anunciar o acesso a sério (ver secção
    "Primeiro acesso" acima).
+5. **Se o site ficar inacessível**, veja primeiro os "Logs" do serviço de
+   hospedagem: se o servidor nunca chegou a arrancar (não aparece a linha
+   "Servidor em http://..."), o problema é quase sempre a ligação à base
+   de dados — confirme a `DATABASE_URL` (pooler, não directa) e se o
+   projecto Supabase não tem restrições de rede activas (Project Settings
+   → Database → Network Restrictions).
 
 ## O que está incluído
 

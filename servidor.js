@@ -21,7 +21,7 @@ if (!process.env.DATABASE_URL) {
   console.error(
     "\nFalta a variável de ambiente DATABASE_URL (connection string do Supabase).\n" +
       "Defina-a antes de arrancar o servidor, ex:\n" +
-      '  DATABASE_URL="postgresql://postgres:...@db.xxxx.supabase.co:5432/postgres" node servidor.js\n'
+      '  DATABASE_URL="postgresql://postgres.xxxx:senha@aws-0-<regiao>.pooler.supabase.com:6543/postgres" node servidor.js\n'
   );
   process.exit(1);
 }
@@ -29,6 +29,16 @@ if (!process.env.DATABASE_URL) {
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }, // necessário para ligar ao Supabase
+  connectionTimeoutMillis: 10000, // falhar depressa e com um erro claro, em vez de ficar pendurado
+  keepAlive: true,
+});
+
+// O Supabase (via pgbouncer) pode fechar ligações inativas na pool a
+// qualquer momento. Sem este handler, esse evento não seria capturado e
+// derrubaria todo o processo Node (erro "unhandled 'error' event"),
+// fazendo o serviço no Render reiniciar em loop e parecer "não liga".
+pool.on("error", (err) => {
+  console.error("Erro numa ligação inativa da pool Postgres (recuperado, servidor continua no ar):", err.message);
 });
 
 // ---------------------------------------------------------------------------
@@ -721,6 +731,18 @@ seedIfEmpty()
     });
   })
   .catch((err) => {
-    console.error("Falha ao ligar à base de dados Supabase:", err.message);
+    console.error("\nFalha ao ligar à base de dados Supabase:", err.message);
+    if (["ENOTFOUND", "ETIMEDOUT", "ECONNREFUSED", "EHOSTUNREACH"].includes(err.code)) {
+      console.error(
+        "\nEste erro é típico quando a DATABASE_URL usa a ligação directa do Supabase\n" +
+          '("db.xxxx.supabase.co:5432"), que só responde por IPv6 — e o Render (tal como\n' +
+          "muitos outros serviços de hospedagem) não tem saída IPv6, só IPv4.\n\n" +
+          "Solução: no painel do Supabase, vá a Project Settings > Database > Connection\n" +
+          'string e copie a ligação "Connection pooler" (Supavisor) em vez da directa —\n' +
+          "algo como:\n" +
+          "  postgresql://postgres.<ref>:<senha>@aws-0-<regiao>.pooler.supabase.com:6543/postgres\n" +
+          "e actualize a variável DATABASE_URL no Render com esse valor.\n"
+      );
+    }
     process.exit(1);
   });
