@@ -1,5 +1,6 @@
 const LOGO_MAIN = "./logo/logo-main.png";
 const LOGO_SECONDARY = "./logo/logo-secondary.png";
+const LOGO_RAFACYBER = "./logo/RafaCyber.png";
 const PROJECT_CREATOR = {
   name: "RafaCyber",
   role: "Seguranca Alem do Click",
@@ -3707,7 +3708,7 @@ function aboutView() {
             <p class="muted">Créditos e identificação do projeto</p>
           </div>
           <div class="creator-avatar">
-            <img class="creator-logo" src="${LOGO_MAIN}" alt="Logo de RafaCyber" />
+            <img class="creator-logo" src="${LOGO_RAFACYBER}" alt="Logo de RafaCyber" />
           </div>
         </div>
         <div class="creator-details creator-summary">
