@@ -3355,10 +3355,10 @@ function membersView() {
         <div class="list">
           ${filtered
             .map(
-              (member) => `
+              (member, index) => `
               <div class="row" style="grid-template-columns: minmax(0,1.6fr) repeat(3, minmax(0, 1fr));">
                 <div>
-                  <strong>${escapeHTML(member.name)}</strong>
+                  <strong>${index + 1}. ${escapeHTML(member.name)}</strong>
                   <div class="note">${escapeHTML(member.contact || "Sem contacto")}</div>
                 </div>
                 <span class="chip gray">${escapeHTML(className(member.classId))}</span>
