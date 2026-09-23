@@ -1197,6 +1197,12 @@ a { color: inherit; }
   font-weight: 700;
 }
 
+.creator-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
 .creator-details {
   margin-top: 12px;
 }
