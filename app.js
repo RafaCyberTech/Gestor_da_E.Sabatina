@@ -3278,7 +3278,7 @@ function membersView() {
     (item) =>
       (classFilter === "all" || item.classId === classFilter) &&
       (!searchName || normalizeMemberName(item.name).includes(searchName))
-  );
+  ).sort((a, b) => a.name.localeCompare(b.name, "pt", { sensitivity: "base" }));
 
   return `
     <section class="grid two">
