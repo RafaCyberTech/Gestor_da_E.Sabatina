@@ -91,6 +91,7 @@ const seed = () => ({
     reportQuarter: Math.floor(new Date().getMonth() / 3) + 1,
     reportWeek: 1,
     editMemberId: null,
+    memberSearchName: "",
     settingsTab: "weights",
     sidebarOpen: false,
     materialType: "foto",
@@ -2151,6 +2152,19 @@ function wireEvents() {
     });
   });
 
+  document.querySelectorAll("[data-action='member-search']").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.ui.memberSearchName = input.value;
+      persistUiLocal();
+      render();
+      const searchInput = document.querySelector("[data-action='member-search']");
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+      }
+    });
+  });
+
   document.querySelectorAll("[data-action='lesson-filter-class']").forEach((select) => {
     select.addEventListener("change", () => {
       state.ui.lessonClassId = select.value;
@@ -2405,6 +2419,15 @@ function normalizeUsername(value) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+function normalizeMemberName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function handleMemberSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -2419,6 +2442,13 @@ async function handleMemberSubmit(event) {
     const member = state.members.find((item) => item.id === state.ui.editMemberId);
     if (member) Object.assign(member, payload);
   } else {
+    const normalizedName = normalizeMemberName(payload.name);
+    const existingMember = state.members.find((item) => normalizeMemberName(item.name) === normalizedName);
+    if (existingMember) {
+      alert(`O membro "${existingMember.name}" já está cadastrado.`);
+      return;
+    }
+
     const newMemberId = uid("m");
     state.members.push({ id: newMemberId, ...payload });
 
@@ -3243,7 +3273,12 @@ function membersView() {
   const secretary = isSecretary();
   const members = visibleMembers();
   const classFilter = state.ui.memberFilterClass;
-  const filtered = classFilter === "all" ? members : members.filter((item) => item.classId === classFilter);
+  const searchName = normalizeMemberName(state.ui.memberSearchName);
+  const filtered = members.filter(
+    (item) =>
+      (classFilter === "all" || item.classId === classFilter) &&
+      (!searchName || normalizeMemberName(item.name).includes(searchName))
+  );
 
   return `
     <section class="grid two">
@@ -3302,7 +3337,11 @@ function membersView() {
             <h2>Membros matriculados</h2>
             </div>
         </div>
-        <div class="form-grid">
+        <div class="form-grid two">
+          <div class="field">
+            <label for="memberSearchName">Pesquisar por nome</label>
+            <input id="memberSearchName" type="search" data-action="member-search" value="${escapeHTML(state.ui.memberSearchName || "")}" placeholder="Digite o nome do membro" />
+          </div>
           <div class="field">
             <label for="memberFilterClass">Filtrar classe</label>
             <select id="memberFilterClass" data-action="member-filter">

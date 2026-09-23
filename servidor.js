@@ -59,6 +59,15 @@ function dateStr(value) {
   return value.toISOString().slice(0, 10);
 }
 
+function normalizeMemberName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // Senha inicial da conta DIRECAO (a mesma que já vinha antes). Só é usada
 // para criar a conta na primeira execução, quando a base de dados ainda
 // não tem nenhum utilizador. Mude-a logo a seguir em Minha Conta.
@@ -504,6 +513,17 @@ async function handleApi(req, res, urlPath) {
     const next = {};
     for (const key of SHARED_KEYS) {
       if (body[key] !== undefined) next[key] = body[key];
+    }
+    if (Array.isArray(next.members)) {
+      const names = new Set();
+      for (const member of next.members) {
+        const normalizedName = normalizeMemberName(member.name);
+        if (!normalizedName) return sendJSON(res, 400, { error: "O nome do membro é obrigatório." });
+        if (names.has(normalizedName)) {
+          return sendJSON(res, 409, { error: `Já existe um membro com o nome "${String(member.name).trim()}".` });
+        }
+        names.add(normalizedName);
+      }
     }
     await setAppData(next);
     return sendJSON(res, 200, await getAppData());
