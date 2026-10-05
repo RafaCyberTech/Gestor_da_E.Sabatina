@@ -141,6 +141,11 @@ function formatExportDate(dateString) {
 }
 
 async function downloadMemberLists() {
+  if (!isSecretary()) {
+    alert("Apenas a direcção pode baixar as listas de membros.");
+    return;
+  }
+
   const selectedClassId = state.ui.memberFilterClass || "all";
   const members = visibleMembers();
   const selectedClasses = selectedClassId === "all"
@@ -3419,7 +3424,7 @@ function membersView() {
           <div>
             <h2>Membros matriculados</h2>
             </div>
-          <button type="button" class="btn" data-action="download-members" title="Baixa todas as classes ou apenas a classe selecionada">${icon("print")} Baixar lista</button>
+          ${secretary ? `<button type="button" class="btn" data-action="download-members" title="Baixa todas as classes ou apenas a classe selecionada">${icon("print")} Baixar lista</button>` : ""}
         </div>
         <div class="form-grid two">
           <div class="field">
