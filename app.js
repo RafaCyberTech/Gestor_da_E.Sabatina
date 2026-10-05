@@ -159,22 +159,6 @@ async function downloadMemberLists() {
   if (selectedClassId === "all" && withoutClass.length) sections.push({ klass: null, members: withoutClass });
   if (!sections.length) sections.push({ klass: null, members: [] });
 
-  let logo = "";
-  try {
-    const response = await fetch(LOGO_SECONDARY);
-    if (response.ok) {
-      const blob = await response.blob();
-      logo = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => resolve("");
-        reader.readAsDataURL(blob);
-      });
-    }
-  } catch (error) {
-    console.warn("Não foi possível incluir o logótipo na lista exportada.", error);
-  }
-
   const year = new Date().getFullYear();
   const pages = sections.map(({ klass, members: rows }) => {
     const classTitle = klass?.name || "Membros sem classe";
@@ -189,7 +173,6 @@ async function downloadMemberLists() {
     }).join("");
     return `<section class="export-page">
       <header class="export-header">
-        ${logo ? `<img src="${logo}" alt="Logótipo" />` : ""}
         <div><strong>ESCOLA SABATINA</strong><br /><span>e</span><br /><strong>Ministério Pessoal</strong></div>
       </header>
       <div class="export-title">LISTA DE CONTACTOS TELEFÓNICOS DA CLASSE</div>
@@ -204,8 +187,7 @@ async function downloadMemberLists() {
     body { margin: 0; color: #000; font-family: "Times New Roman", serif; font-size: 12px; }
     .export-page { min-height: 180mm; page-break-after: always; }
     .export-page:last-child { page-break-after: auto; }
-    .export-header { min-height: 70px; position: relative; text-align: center; line-height: 1.05; padding-top: 12px; }
-    .export-header img { position: absolute; left: 24px; top: 0; width: 64px; height: 64px; object-fit: contain; }
+    .export-header { min-height: 70px; text-align: center; line-height: 1.05; padding-top: 12px; }
     .export-header span { font-size: 11px; }
     .export-title { border-bottom: 1px solid #000; padding: 10px 0 5px; font-size: 12px; }
     .export-meta { display: flex; justify-content: space-between; gap: 20px; margin: 18px 0 6px; font-size: 11px; }
