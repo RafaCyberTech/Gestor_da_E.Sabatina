@@ -133,6 +133,102 @@ function formatDate(dateString) {
   }).format(new Date(normalized));
 }
 
+function formatExportDate(dateString) {
+  if (!dateString) return "";
+  const value = String(dateString).slice(0, 10);
+  const parts = value.split("-");
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : value;
+}
+
+async function downloadMemberLists() {
+  const selectedClassId = state.ui.memberFilterClass || "all";
+  const members = visibleMembers();
+  const selectedClasses = selectedClassId === "all"
+    ? state.classes
+    : state.classes.filter((item) => item.id === selectedClassId);
+
+  const sections = selectedClasses.map((klass) => ({
+    klass,
+    members: members
+      .filter((member) => member.classId === klass.id)
+      .sort((a, b) => a.name.localeCompare(b.name, "pt", { sensitivity: "base" })),
+  }));
+  const withoutClass = members
+    .filter((member) => !member.classId)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt", { sensitivity: "base" }));
+  if (selectedClassId === "all" && withoutClass.length) sections.push({ klass: null, members: withoutClass });
+  if (!sections.length) sections.push({ klass: null, members: [] });
+
+  let logo = "";
+  try {
+    const response = await fetch(LOGO_SECONDARY);
+    if (response.ok) {
+      const blob = await response.blob();
+      logo = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(blob);
+      });
+    }
+  } catch (error) {
+    console.warn("Não foi possível incluir o logótipo na lista exportada.", error);
+  }
+
+  const year = new Date().getFullYear();
+  const pages = sections.map(({ klass, members: rows }) => {
+    const classTitle = klass?.name || "Membros sem classe";
+    const tableRows = Array.from({ length: Math.max(20, rows.length) }, (_, index) => {
+      const member = rows[index];
+      return `<tr>
+        <td class="number">${index + 1}</td>
+        <td>${member ? escapeHTML(member.name) : ""}</td>
+        <td>${member ? escapeHTML(member.contact || "") : ""}</td>
+        <td>${member ? formatExportDate(member.joinedAt) : ""}</td>
+      </tr>`;
+    }).join("");
+    return `<section class="export-page">
+      <header class="export-header">
+        ${logo ? `<img src="${logo}" alt="Logótipo" />` : ""}
+        <div><strong>ESCOLA SABATINA</strong><br /><span>e</span><br /><strong>Ministério Pessoal</strong></div>
+      </header>
+      <div class="export-title">LISTA DE CONTACTOS TELEFÓNICOS DA CLASSE</div>
+      <div class="export-meta"><span><strong>Classe:</strong> ${escapeHTML(classTitle)}</span><span><strong>Trimestre:</strong> ________</span><span><strong>Ano:</strong> ${year}</span></div>
+      <table><thead><tr><th>Nº</th><th>Membros da Classe</th><th>Contacto</th><th>Data de inscrição</th></tr></thead><tbody>${tableRows}</tbody></table>
+    </section>`;
+  }).join("");
+
+  const documentHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    @page { size: A4 landscape; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #000; font-family: "Times New Roman", serif; font-size: 12px; }
+    .export-page { min-height: 180mm; page-break-after: always; }
+    .export-page:last-child { page-break-after: auto; }
+    .export-header { min-height: 70px; position: relative; text-align: center; line-height: 1.05; padding-top: 12px; }
+    .export-header img { position: absolute; left: 24px; top: 0; width: 64px; height: 64px; object-fit: contain; }
+    .export-header span { font-size: 11px; }
+    .export-title { border-bottom: 1px solid #000; padding: 10px 0 5px; font-size: 12px; }
+    .export-meta { display: flex; justify-content: space-between; gap: 20px; margin: 18px 0 6px; font-size: 11px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid #000; height: 20px; padding: 2px 6px; }
+    th { text-align: center; font-weight: bold; }
+    .number { width: 36px; text-align: center; }
+    th:nth-child(2), td:nth-child(2) { width: 45%; }
+    th:nth-child(3), td:nth-child(3) { width: 27%; }
+    th:nth-child(4), td:nth-child(4) { width: 20%; }
+  </style></head><body>${pages}</body></html>`;
+
+  const blob = new Blob([documentHtml], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = selectedClassId === "all" ? `listas-de-membros-${year}.xls` : `lista-${(selectedClasses[0]?.name || "classe").replace(/[^\wÀ-ÿ]+/g, "-")}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function escapeHTML(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -588,12 +684,12 @@ function loginView() {
           <div class="form-grid">
             <div class="field">
               <label for="username">Usuário</label>
-              <input id="username" name="username" autocomplete="username" placeholder="Ex: DIRECAO ou o seu primeiro nome" autofocus />
+              <input id="username" name="username" autocomplete="username" placeholder="" autofocus />
             </div>
             <div class="field">
               <label for="password">Senha</label>
               <div style="display:flex;gap:8px;align-items:center;">
-                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Senha" style="flex:1;" />
+                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="" style="flex:1;" />
                 <button type="button" data-action="toggle-password" style="padding:8px;background:none;border:none;cursor:pointer;color:#58706b;">${icon("eye")}</button>
               </div>
             </div>
@@ -618,11 +714,11 @@ function shellView() {
     ["dashboard", "Visão Geral", "home"],
     ["members", "Membros", "members"],
     ...(secretary ? [["attendance", "Presenças", "attendance"], ["lessons", "Lições", "lessons"], ["requests", "Trimensários", "requests"]] : []),
-    ["materials", "Lições Eletrónicas", "lessons"],
+    ["materials", "Material Eletrónico", "lessons"],
     ["program", "Programa", "program"],
     ["ranking", "Classe em Destaque", "ranking"],
     ["reports", "Relatórios", "reports"],
-    ["messages", "Comunicação", "messages"],
+    ["messages", "Chat/Comunicação", "messages"],
     ["account", "Minha Conta", "account"],
     ["about", "Sobre o projeto", "info"],
   ];
@@ -2116,6 +2212,10 @@ function wireEvents() {
   const memberForm = document.getElementById("memberForm");
   if (memberForm) memberForm.addEventListener("submit", handleMemberSubmit);
 
+  document.querySelectorAll("[data-action='download-members']").forEach((button) => {
+    button.addEventListener("click", downloadMemberLists);
+  });
+
   const passwordForm = document.getElementById("passwordForm");
   if (passwordForm) passwordForm.addEventListener("submit", handlePasswordChangeSubmit);
 
@@ -3337,6 +3437,7 @@ function membersView() {
           <div>
             <h2>Membros matriculados</h2>
             </div>
+          <button type="button" class="btn" data-action="download-members" title="Baixa todas as classes ou apenas a classe selecionada">${icon("print")} Baixar lista</button>
         </div>
         <div class="form-grid two">
           <div class="field">
@@ -3714,8 +3815,8 @@ function aboutView() {
         <div class="creator-details creator-summary">
           <h3>Sistema de Gestão da Escola Sabatina</h3>
           <p>Desenvolvido por <strong>${escapeHTML(PROJECT_CREATOR.name)} | ${escapeHTML(PROJECT_CREATOR.role)}!</strong></p>
-          <p>Estudante de Tecnologia da Informação</p>
-          <p class="creator-description">Desenvolvedor do sistema e responsável pelo projeto.</p>
+          <p>Rafique Eusebio Norapelana, Estudante de Tecnologia da Informação, trabalhando na área de Programação Web e Técnico de Redes de Computador</p>
+          <p class="creator-description">Desenvolvedor do sistema e responsável pela gerenciamento.</p>
           <div class="creator-meta">
             <span><strong>Versão:</strong> 1.0.0</span>
             <span><strong>Ano:</strong> ${escapeHTML(PROJECT_CREATOR.year)}</span>
